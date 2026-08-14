@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   ShoppingBag, Leaf, Check, Plus, Minus, X, Heart, Sparkles, ArrowRight, Trash2,
 } from "lucide-react";
@@ -68,6 +68,8 @@ const DEFAULT_CONFIG = { productId: "classic", strength: "regular", sweetness: 5
 /* ---------- Helpers ---------- */
 const findP = (id) => PRODUCTS.find((p) => p.id === id) || PRODUCTS[0];
 const vnd = (n) => n.toLocaleString("vi-VN") + "đ";
+const loadLS = (k, fallback) => { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : fallback; } catch { return fallback; } };
+const saveLS = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} };
 function priceOf(cfg) {
   let t = findP(cfg.productId).base;
   t += MILKS.find((m) => m.id === cfg.milk)?.price || 0;
@@ -389,7 +391,7 @@ function Saved({ items, onOrder, onRemove }) {
 /* ============================================================
    Cart drawer
    ============================================================ */
-function CartDrawer({ open, onClose, items, setItems, onCheckout }) {
+function CartDrawer({ open, onClose, items, setItems, onCheckout, phone, setPhone, note, setNote }) {
   const subtotal = items.reduce((s, it) => s + it.price * it.qty, 0);
   const setQty = (id, d) => setItems((arr) => arr.map((it) => it.id === id ? { ...it, qty: Math.max(1, it.qty + d) } : it));
   const remove = (id) => setItems((arr) => arr.filter((it) => it.id !== id));
@@ -418,9 +420,15 @@ function CartDrawer({ open, onClose, items, setItems, onCheckout }) {
           ))}
         </div>
         <div className="mx-cart-footer">
+          {items.length > 0 && (
+            <>
+              <input className="mx-cart-field" placeholder="Phone number (for pickup)" value={phone} onChange={(e) => setPhone(e.target.value)} />
+              <input className="mx-cart-field" placeholder="Note for the shop (optional)" value={note} onChange={(e) => setNote(e.target.value)} />
+            </>
+          )}
           <div className="mx-subtotal"><span>Subtotal</span><span>{vnd(subtotal)}</span></div>
           <button className="mx-btn mx-btn-ghost" onClick={onClose}>Continue Shopping</button>
-          <button className="mx-btn mx-btn-primary" disabled={!items.length} onClick={onCheckout}>Checkout</button>
+          <button className="mx-btn mx-btn-primary" disabled={!items.length || !phone.trim()} onClick={onCheckout}>Checkout</button>
         </div>
       </aside>
     </>
@@ -433,10 +441,16 @@ function CartDrawer({ open, onClose, items, setItems, onCheckout }) {
 export default function Storefront({ user, name, onLogin, onLogout, onPlaceOrder, onRequireLogin }) {
   const [view, setView] = useState("home");
   const [cfg, setCfg] = useState(DEFAULT_CONFIG);
-  const [cart, setCart] = useState([]);   // swap for localStorage in prod
-  const [saved, setSaved] = useState([]); // swap for localStorage in prod
+  const [cart, setCart] = useState(() => loadLS("mx_cart", []));
+  const [saved, setSaved] = useState(() => loadLS("mx_saved", []));
   const [cartOpen, setCartOpen] = useState(false);
+  const [phone, setPhone] = useState("");
+  const [note, setNote] = useState("");
   const [toast, setToast] = useState(null);
+
+  // Persist cart & saved recipes across refreshes (localStorage).
+  useEffect(() => { saveLS("mx_cart", cart); }, [cart]);
+  useEffect(() => { saveLS("mx_saved", saved); }, [saved]);
 
   const cartCount = cart.reduce((s, it) => s + it.qty, 0);
   const ping = (m) => { setToast(m); setTimeout(() => setToast(null), 2200); };
@@ -450,8 +464,8 @@ export default function Storefront({ user, name, onLogin, onLogout, onPlaceOrder
   const checkout = async () => {
     if (onPlaceOrder) {
       if (!user) { onRequireLogin && onRequireLogin(); return; }
-      const ok = await onPlaceOrder(cart);
-      if (ok) { setCart([]); setCartOpen(false); ping("Order placed — see you at the counter!"); }
+      const ok = await onPlaceOrder(cart, { phone: phone.trim(), note: note.trim() });
+      if (ok) { setCart([]); setCartOpen(false); setPhone(""); setNote(""); }   // App shows the confirmation screen
       else { ping("Couldn't place order. Try again."); }
     } else { setCart([]); setCartOpen(false); ping("Order placed — see you at the counter!"); }
   };
@@ -488,7 +502,7 @@ export default function Storefront({ user, name, onLogin, onLogout, onPlaceOrder
         <span>Whisked with care in Hanoi</span>
       </footer>
 
-      <CartDrawer open={cartOpen} onClose={() => setCartOpen(false)} items={cart} setItems={setCart} onCheckout={checkout} />
+      <CartDrawer open={cartOpen} onClose={() => setCartOpen(false)} items={cart} setItems={setCart} onCheckout={checkout} phone={phone} setPhone={setPhone} note={note} setNote={setNote} />
       {toast && <div className="mx-toast">{toast}</div>}
     </div>
   );
@@ -673,6 +687,8 @@ h1,h2,h3{font-family:'Fraunces','Georgia',serif;font-weight:600;margin:0;letter-
 .mx-cartx{position:absolute;top:.6rem;right:.6rem;width:24px;height:24px;border-radius:50%;color:rgba(48,66,54,.4);display:grid;place-items:center;}
 .mx-cartx:hover{color:var(--matcha);background:var(--warm);}
 .mx-cart-footer{padding:1.3rem 1.5rem;border-top:1px solid rgba(48,66,54,.08);display:flex;flex-direction:column;gap:.6rem;}
+.mx-cart-field{padding:.65rem .85rem;border-radius:12px;border:1.5px solid rgba(48,66,54,.14);background:var(--cream);font-family:inherit;font-size:.88rem;color:var(--dark);}
+.mx-cart-field:focus{outline:none;border-color:var(--matcha);}
 .mx-subtotal{display:flex;justify-content:space-between;font-size:1.1rem;font-weight:700;margin-bottom:.4rem;}
 
 /* misc */

@@ -4,10 +4,11 @@ import { useAuth } from "../lib/AuthContext.jsx";
 import { BUNNY_SVG } from "../data/assets.js";
 import { vnd, summaryLines } from "../data/menu.js";
 import MessageList from "./MessageList.jsx";
+import StarRating from "./StarRating.jsx";
 import { X, Send, ShoppingBag, MessageSquare } from "lucide-react";
 
-const STATUS_LABEL = { received: "New", making: "Making", ready: "Ready", cancelled: "Cancelled" };
-const STATUS_COLOR = { received: "#9B8068", making: "#6F8F62", ready: "#4c7a3f", cancelled: "#b06a6a" };
+const STATUS_LABEL = { received: "New", making: "Making", ready: "Ready", completed: "Picked up", cancelled: "Cancelled" };
+const STATUS_COLOR = { received: "#9B8068", making: "#6F8F62", ready: "#4c7a3f", completed: "#7a8a72", cancelled: "#b06a6a" };
 const timeVN = (iso) =>
   new Date(iso).toLocaleString("en-GB", { timeZone: "Asia/Ho_Chi_Minh", hour: "2-digit", minute: "2-digit", day: "2-digit", month: "2-digit" });
 
@@ -16,6 +17,9 @@ function OrdersTab() {
   const [orders, setOrders] = useState([]);
   const [itemsByOrder, setItemsByOrder] = useState({});
   const [names, setNames] = useState({});
+  const [reviews, setReviews] = useState({});
+  const [q, setQ] = useState("");
+  const [statusF, setStatusF] = useState("all");
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
@@ -29,7 +33,9 @@ function OrdersTab() {
       const grp = {};
       (its || []).forEach((it) => { (grp[it.order_id] ||= []).push(it); });
       setItemsByOrder(grp);
-    } else setItemsByOrder({});
+      const { data: rv } = await supabase.from("reviews").select("*").in("order_id", oids);
+      const rm = {}; (rv || []).forEach((r) => (rm[r.order_id] = r)); setReviews(rm);
+    } else { setItemsByOrder({}); setReviews({}); }
     const uids = [...new Set(rows.map((o) => o.user_id))];
     if (uids.length) {
       const { data: profs } = await supabase.from("profiles").select("id, display_name").in("id", uids);
@@ -42,6 +48,7 @@ function OrdersTab() {
     const ch = supabase.channel("owner-orders")
       .on("postgres_changes", { event: "*", schema: "public", table: "orders" }, () => load())
       .on("postgres_changes", { event: "*", schema: "public", table: "order_items" }, () => load())
+      .on("postgres_changes", { event: "*", schema: "public", table: "reviews" }, () => load())
       .subscribe();
     return () => supabase.removeChannel(ch);
   }, [load]);
@@ -50,16 +57,34 @@ function OrdersTab() {
     const patch = { status };
     if (status === "making") patch.making_at = new Date().toISOString();
     if (status === "ready") patch.ready_at = new Date().toISOString();
+    if (status === "completed") patch.completed_at = new Date().toISOString();
     setOrders((os) => os.map((o) => (o.id === id ? { ...o, ...patch } : o)));
     await supabase.from("orders").update(patch).eq("id", id);
   };
 
   if (loading) return <div className="od-empty">Loading orders…</div>;
-  if (!orders.length) return <div className="od-empty">No orders yet. New orders appear here in real time.</div>;
+
+  const ql = q.trim().toLowerCase();
+  const filtered = orders.filter((o) => {
+    if (statusF !== "all" && o.status !== statusF) return false;
+    if (!ql) return true;
+    const hay = ((o.order_no || "") + " " + (names[o.user_id] || "") + " " + (o.phone || "")).toLowerCase();
+    return hay.includes(ql);
+  });
 
   return (
     <div className="od-orders">
-      {orders.map((o) => (
+      <div className="od-toolbar">
+        <input className="od-search" placeholder="Search order code, name or phone…" value={q} onChange={(e) => setQ(e.target.value)} />
+        <div className="od-chips">
+          {[["all", "All"], ["received", "New"], ["making", "Making"], ["ready", "Ready"], ["completed", "Picked up"], ["cancelled", "Cancelled"]].map(([v, l]) => (
+            <button key={v} className={"od-chip" + (statusF === v ? " on" : "")} onClick={() => setStatusF(v)}>{l}</button>
+          ))}
+        </div>
+      </div>
+      {orders.length === 0 && <div className="od-empty">No orders yet. New orders appear here in real time.</div>}
+      {orders.length > 0 && filtered.length === 0 && <div className="od-empty">No matching orders.</div>}
+      {filtered.map((o) => (
         <div key={o.id} className="od-order">
           <div className="od-order-top">
             <div>
@@ -67,8 +92,19 @@ function OrdersTab() {
               <span className="od-cust">{names[o.user_id] || "Guest"}</span>
               <span className="od-time">{timeVN(o.created_at)}</span>
             </div>
-            <span className="od-badge" style={{ background: STATUS_COLOR[o.status] }}>{STATUS_LABEL[o.status]}</span>
+            <div className="od-badges">
+              {reviews[o.id] && (
+                <span className="od-review-badge"><StarRating value={reviews[o.id].rating} size={13} readOnly /> {reviews[o.id].rating}.0</span>
+              )}
+              <span className="od-badge" style={{ background: STATUS_COLOR[o.status] }}>{STATUS_LABEL[o.status]}</span>
+            </div>
           </div>
+          {(o.phone || o.note) && (
+            <div className="od-contact">
+              {o.phone && <span className="od-phone">☎ {o.phone}</span>}
+              {o.note && <span className="od-ordernote">“{o.note}”</span>}
+            </div>
+          )}
 
           <div className="od-items">
             {(itemsByOrder[o.id] || []).map((it) => (
@@ -83,11 +119,14 @@ function OrdersTab() {
             ))}
           </div>
 
+          {reviews[o.id]?.comment && <div className="od-review-comment">“{reviews[o.id].comment}”</div>}
+
           <div className="od-order-foot">
             <span className="od-total">{vnd(o.subtotal)}</span>
             <div className="od-actions">
               {o.status === "received" && <button className="od-btn go" onClick={() => setStatus(o.id, "making")}>Start making</button>}
               {o.status === "making" && <button className="od-btn go" onClick={() => setStatus(o.id, "ready")}>Mark ready</button>}
+              {o.status === "ready" && <button className="od-btn go" onClick={() => setStatus(o.id, "completed")}>Picked up</button>}
               {o.status !== "ready" && o.status !== "cancelled" && (
                 <button className="od-btn cancel" onClick={() => setStatus(o.id, "cancelled")}>Cancel</button>
               )}
@@ -234,12 +273,24 @@ export default function OwnerDashboard({ onClose }) {
         .od-empty.sm{font-size:.85rem;padding:1rem;}
 
         .od-orders{flex:1;overflow-y:auto;padding:1.2rem;display:flex;flex-direction:column;gap:1rem;}
+        .od-toolbar{display:flex;flex-direction:column;gap:.6rem;}
+        .od-search{padding:.7rem .9rem;border-radius:12px;border:1.5px solid rgba(48,66,54,.14);background:#F8F5ED;font-family:inherit;font-size:.9rem;color:#304236;}
+        .od-search:focus{outline:none;border-color:#6F8F62;}
+        .od-chips{display:flex;gap:.4rem;flex-wrap:wrap;}
+        .od-chip{border:1.5px solid rgba(48,66,54,.12);background:none;padding:.35rem .8rem;border-radius:999px;font-size:.8rem;font-weight:600;color:#5b6b5f;cursor:pointer;font-family:inherit;}
+        .od-chip.on{background:#6F8F62;color:#fff;border-color:#6F8F62;}
+        .od-contact{display:flex;gap:.7rem;flex-wrap:wrap;margin:-.2rem 0 .7rem;font-size:.8rem;}
+        .od-phone{font-weight:600;color:#304236;}
+        .od-ordernote{color:#5b6b5f;font-style:italic;}
         .od-order{border:1px solid rgba(48,66,54,.1);border-radius:16px;padding:1rem;background:#fff;}
         .od-order-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:.7rem;}
         .od-no{font-family:'Fraunces',Georgia,serif;font-weight:700;font-size:1.05rem;color:#6F8F62;margin-right:.6rem;}
         .od-cust{font-weight:600;font-size:.95rem;}
         .od-time{font-size:.75rem;color:#9aa89a;margin-left:.5rem;}
         .od-badge{color:#fff;font-size:.72rem;font-weight:600;padding:.25rem .6rem;border-radius:999px;}
+        .od-badges{display:flex;align-items:center;gap:.5rem;}
+        .od-review-badge{display:inline-flex;align-items:center;gap:.25rem;font-size:.75rem;font-weight:700;color:#4c7a3f;background:#DDE8D8;padding:.2rem .5rem;border-radius:999px;}
+        .od-review-comment{font-size:.82rem;color:#5b6b5f;font-style:italic;background:#F8F5ED;padding:.5rem .7rem;border-radius:10px;margin-bottom:.7rem;}
         .od-items{display:flex;flex-direction:column;gap:.5rem;margin-bottom:.8rem;}
         .od-item{display:flex;align-items:flex-start;gap:.6rem;}
         .od-qty{font-weight:700;color:#6F8F62;}

@@ -7,6 +7,7 @@ import Storefront from "./Storefront.jsx";
 import ChatDock from "./components/ChatDock.jsx";
 import OwnerDashboard from "./components/OwnerDashboard.jsx";
 import MyOrders from "./components/MyOrders.jsx";
+import OrderConfirm from "./components/OrderConfirm.jsx";
 import { Receipt } from "lucide-react";
 
 function Shell() {
@@ -14,18 +15,21 @@ function Shell() {
   const [authOpen, setAuthOpen] = useState(false);
   const [ownerOpen, setOwnerOpen] = useState(false);
   const [ordersOpen, setOrdersOpen] = useState(false);
+  const [confirm, setConfirm] = useState(null);
   const [toast, setToast] = useState(null);
   const placingRef = useRef(false); // guard against double-click checkout
 
   // Checkout -> create order + line items (schema v2).
-  const placeOrder = async (cart) => {
+  const placeOrder = async (cart, details = {}) => {
     if (!user) { setAuthOpen(true); return false; }
     if (placingRef.current) return false;   // already placing -> ignore
     placingRef.current = true;
     try {
       const subtotal = cart.reduce((s, it) => s + it.price * it.qty, 0);
       const { data: order, error } = await supabase
-        .from("orders").insert({ user_id: user.id, subtotal }).select().single();
+        .from("orders")
+        .insert({ user_id: user.id, subtotal, phone: details.phone || null, note: details.note || null })
+        .select().single();
       if (error || !order) { console.error("[order]", error); return false; }
 
       const rows = cart.map((it) => ({
@@ -39,6 +43,7 @@ function Shell() {
         await supabase.from("orders").delete().eq("id", order.id); // clean up empty order
         return false;
       }
+      setConfirm({ order_no: order.order_no, subtotal, count: cart.reduce((a, it) => a + it.qty, 0) });
       return true;
     } finally {
       placingRef.current = false;
@@ -88,6 +93,11 @@ function Shell() {
         <button className="mxr-ownerbtn" onClick={() => setOwnerOpen(true)}>🐰 Manage shop</button>
       )}
 
+      {confirm && (
+        <OrderConfirm order={confirm}
+          onTrack={() => { setConfirm(null); setOrdersOpen(true); }}
+          onClose={() => setConfirm(null)} />
+      )}
       {ordersOpen && <MyOrders onClose={() => setOrdersOpen(false)} />}
       {ownerOpen && <OwnerDashboard onClose={() => setOwnerOpen(false)} />}
       {authOpen && <AuthModal onClose={() => setAuthOpen(false)} />}
