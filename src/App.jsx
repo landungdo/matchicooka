@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { AuthProvider, useAuth } from "./lib/AuthContext.jsx";
 import { supabase } from "./lib/supabase.js";
-import { findP, summaryLines } from "./data/menu.js";
+import { findP } from "./data/menu.js";
 import AuthModal from "./components/AuthModal.jsx";
 import Storefront from "./Storefront.jsx";
 import ChatDock from "./components/ChatDock.jsx";
@@ -12,18 +12,29 @@ function Shell() {
   const [authOpen, setAuthOpen] = useState(false);
   const [ownerOpen, setOwnerOpen] = useState(false);
 
+  // Checkout -> create an order + its line items (normalized schema v2).
   const placeOrder = async (cart) => {
     if (!user) { setAuthOpen(true); return false; }
-    const items = cart.map((it) => ({
-      name: findP(it.config.productId).name,
-      lines: summaryLines(it.config),
+    const subtotal = cart.reduce((s, it) => s + it.price * it.qty, 0);
+
+    const { data: order, error } = await supabase
+      .from("orders")
+      .insert({ user_id: user.id, subtotal })
+      .select()
+      .single();
+    if (error || !order) { console.error("[order]", error); return false; }
+
+    const rows = cart.map((it) => ({
+      order_id: order.id,
+      user_id: user.id,
+      product_id: it.config.productId,
+      product_name: findP(it.config.productId).name,
       config: it.config,
       qty: it.qty,
       price: it.price,
     }));
-    const subtotal = cart.reduce((s, it) => s + it.price * it.qty, 0);
-    const { error } = await supabase.from("orders").insert({ user_id: user.id, items, subtotal });
-    if (error) { console.error("[order]", error); return false; }
+    const { error: e2 } = await supabase.from("order_items").insert(rows);
+    if (e2) { console.error("[order_items]", e2); return false; }
     return true;
   };
 
@@ -39,12 +50,15 @@ function Shell() {
         onPlaceOrder={placeOrder}
         onRequireLogin={() => setAuthOpen(true)}
       />
+
       {user && !isOwner && <ChatDock />}
       {isOwner && (
-        <button className="mxr-ownerbtn" onClick={() => setOwnerOpen(true)}>🐰 Quản lý quán</button>
+        <button className="mxr-ownerbtn" onClick={() => setOwnerOpen(true)}>🐰 Manage shop</button>
       )}
+
       {ownerOpen && <OwnerDashboard onClose={() => setOwnerOpen(false)} />}
       {authOpen && <AuthModal onClose={() => setAuthOpen(false)} />}
+
       <style>{`
         .mxr-ownerbtn{position:fixed;left:16px;bottom:16px;z-index:70;background:#304236;color:#F8F5ED;border:none;
           padding:.75rem 1.15rem;border-radius:999px;font-weight:600;font-size:.9rem;cursor:pointer;

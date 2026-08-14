@@ -2,30 +2,37 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { supabase } from "../lib/supabase.js";
 import { useAuth } from "../lib/AuthContext.jsx";
 import { BUNNY_SVG } from "../data/assets.js";
-import { vnd } from "../data/menu.js";
-import { X, Send, RefreshCw, ShoppingBag, MessageSquare } from "lucide-react";
+import { vnd, summaryLines } from "../data/menu.js";
+import { X, Send, ShoppingBag, MessageSquare } from "lucide-react";
 
-const STATUS_LABEL = { pending: "Chờ pha", making: "Đang pha", done: "Xong", cancelled: "Đã huỷ" };
-const STATUS_COLOR = { pending: "#9B8068", making: "#6F8F62", done: "#4c7a3f", cancelled: "#b06a6a" };
-const timeVN = (iso) => new Date(iso).toLocaleString("vi-VN", { hour: "2-digit", minute: "2-digit", day: "2-digit", month: "2-digit" });
+const STATUS_LABEL = { received: "New", making: "Making", ready: "Ready", cancelled: "Cancelled" };
+const STATUS_COLOR = { received: "#9B8068", making: "#6F8F62", ready: "#4c7a3f", cancelled: "#b06a6a" };
+const timeVN = (iso) =>
+  new Date(iso).toLocaleString("en-GB", { timeZone: "Asia/Ho_Chi_Minh", hour: "2-digit", minute: "2-digit", day: "2-digit", month: "2-digit" });
 
 /* ---------------- Orders tab ---------------- */
 function OrdersTab() {
   const [orders, setOrders] = useState([]);
+  const [itemsByOrder, setItemsByOrder] = useState({});
   const [names, setNames] = useState({});
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
-    const { data } = await supabase.from("orders").select("*").order("created_at", { ascending: false });
-    const rows = data || [];
+    const { data: os } = await supabase.from("orders").select("*").order("created_at", { ascending: false });
+    const rows = os || [];
     setOrders(rows);
     setLoading(false);
-    const ids = [...new Set(rows.map((o) => o.user_id))];
-    if (ids.length) {
-      const { data: profs } = await supabase.from("profiles").select("id, display_name").in("id", ids);
-      const map = {};
-      (profs || []).forEach((p) => (map[p.id] = p.display_name));
-      setNames(map);
+    const oids = rows.map((o) => o.id);
+    if (oids.length) {
+      const { data: its } = await supabase.from("order_items").select("*").in("order_id", oids);
+      const grp = {};
+      (its || []).forEach((it) => { (grp[it.order_id] ||= []).push(it); });
+      setItemsByOrder(grp);
+    } else setItemsByOrder({});
+    const uids = [...new Set(rows.map((o) => o.user_id))];
+    if (uids.length) {
+      const { data: profs } = await supabase.from("profiles").select("id, display_name").in("id", uids);
+      const map = {}; (profs || []).forEach((p) => (map[p.id] = p.display_name)); setNames(map);
     }
   }, []);
 
@@ -33,17 +40,21 @@ function OrdersTab() {
     load();
     const ch = supabase.channel("owner-orders")
       .on("postgres_changes", { event: "*", schema: "public", table: "orders" }, () => load())
+      .on("postgres_changes", { event: "*", schema: "public", table: "order_items" }, () => load())
       .subscribe();
     return () => supabase.removeChannel(ch);
   }, [load]);
 
   const setStatus = async (id, status) => {
-    setOrders((os) => os.map((o) => (o.id === id ? { ...o, status } : o)));
-    await supabase.from("orders").update({ status }).eq("id", id);
+    const patch = { status };
+    if (status === "making") patch.making_at = new Date().toISOString();
+    if (status === "ready") patch.ready_at = new Date().toISOString();
+    setOrders((os) => os.map((o) => (o.id === id ? { ...o, ...patch } : o)));
+    await supabase.from("orders").update(patch).eq("id", id);
   };
 
-  if (loading) return <div className="od-empty">Đang tải đơn…</div>;
-  if (!orders.length) return <div className="od-empty">Chưa có đơn nào. Đơn mới sẽ hiện ở đây theo thời gian thực.</div>;
+  if (loading) return <div className="od-empty">Loading orders…</div>;
+  if (!orders.length) return <div className="od-empty">No orders yet. New orders appear here in real time.</div>;
 
   return (
     <div className="od-orders">
@@ -51,19 +62,20 @@ function OrdersTab() {
         <div key={o.id} className="od-order">
           <div className="od-order-top">
             <div>
-              <span className="od-cust">{names[o.user_id] || "Khách"}</span>
+              <span className="od-no">{o.order_no || "—"}</span>
+              <span className="od-cust">{names[o.user_id] || "Guest"}</span>
               <span className="od-time">{timeVN(o.created_at)}</span>
             </div>
             <span className="od-badge" style={{ background: STATUS_COLOR[o.status] }}>{STATUS_LABEL[o.status]}</span>
           </div>
 
           <div className="od-items">
-            {(o.items || []).map((it, i) => (
-              <div key={i} className="od-item">
+            {(itemsByOrder[o.id] || []).map((it) => (
+              <div key={it.id} className="od-item">
                 <span className="od-qty">{it.qty}×</span>
                 <div>
-                  <div className="od-item-name">{it.name || "Matcha"}</div>
-                  <div className="od-item-lines">{(it.lines || []).join(" · ")}</div>
+                  <div className="od-item-name">{it.product_name}</div>
+                  <div className="od-item-lines">{summaryLines(it.config).join(" · ")}</div>
                 </div>
                 <span className="od-item-price">{vnd(it.price * it.qty)}</span>
               </div>
@@ -73,10 +85,10 @@ function OrdersTab() {
           <div className="od-order-foot">
             <span className="od-total">{vnd(o.subtotal)}</span>
             <div className="od-actions">
-              {o.status === "pending" && <button className="od-btn go" onClick={() => setStatus(o.id, "making")}>Bắt đầu pha</button>}
-              {o.status === "making" && <button className="od-btn go" onClick={() => setStatus(o.id, "done")}>Xong đơn</button>}
-              {o.status !== "done" && o.status !== "cancelled" && (
-                <button className="od-btn cancel" onClick={() => setStatus(o.id, "cancelled")}>Huỷ</button>
+              {o.status === "received" && <button className="od-btn go" onClick={() => setStatus(o.id, "making")}>Start making</button>}
+              {o.status === "making" && <button className="od-btn go" onClick={() => setStatus(o.id, "ready")}>Mark ready</button>}
+              {o.status !== "ready" && o.status !== "cancelled" && (
+                <button className="od-btn cancel" onClick={() => setStatus(o.id, "cancelled")}>Cancel</button>
               )}
             </div>
           </div>
@@ -142,17 +154,17 @@ function MessagesTab({ ownerId }) {
   return (
     <div className="od-chat">
       <div className="od-rooms">
-        {rooms.length === 0 && <div className="od-empty sm">Chưa có ai nhắn tin.</div>}
+        {rooms.length === 0 && <div className="od-empty sm">No messages yet.</div>}
         {rooms.map((r) => (
           <button key={r} className={"od-room" + (sel === r ? " on" : "")} onClick={() => setSel(r)}>
             <span className="od-room-ava" dangerouslySetInnerHTML={{ __html: BUNNY_SVG }} />
-            {names[r] || "Khách"}
+            {names[r] || "Guest"}
           </button>
         ))}
       </div>
 
       <div className="od-thread">
-        {!sel && <div className="od-empty">Chọn một khách để trả lời.</div>}
+        {!sel && <div className="od-empty">Select a customer to reply.</div>}
         {sel && (
           <>
             <div className="od-thread-body">
@@ -164,9 +176,9 @@ function MessagesTab({ ownerId }) {
               <div ref={endRef} />
             </div>
             <div className="od-thread-foot">
-              <input className="cd-input" placeholder="Trả lời khách…" value={text}
+              <input className="cd-input" placeholder="Reply to customer…" value={text}
                      onChange={(e) => setText(e.target.value)} onKeyDown={(e) => e.key === "Enter" && send()} />
-              <button className="cd-send" onClick={send} aria-label="Gửi"><Send size={17} /></button>
+              <button className="cd-send" onClick={send} aria-label="Send"><Send size={17} /></button>
             </div>
           </>
         )}
@@ -186,18 +198,18 @@ export default function OwnerDashboard({ onClose }) {
         <header className="od-head">
           <span className="od-bunny" dangerouslySetInnerHTML={{ __html: BUNNY_SVG }} />
           <div className="od-hi">
-            <div className="od-shop">matchicooka · quản lý</div>
-            <div className="od-owner">Xin chào {name}</div>
+            <div className="od-shop">matchicooka · manager</div>
+            <div className="od-owner">Hi {name}</div>
           </div>
           <div className="od-tabs">
             <button className={"od-tab" + (tab === "orders" ? " on" : "")} onClick={() => setTab("orders")}>
-              <ShoppingBag size={15} /> Đơn hàng
+              <ShoppingBag size={15} /> Orders
             </button>
             <button className={"od-tab" + (tab === "chat" ? " on" : "")} onClick={() => setTab("chat")}>
-              <MessageSquare size={15} /> Tin nhắn
+              <MessageSquare size={15} /> Messages
             </button>
           </div>
-          <button className="od-close" onClick={onClose} aria-label="Đóng"><X size={20} /></button>
+          <button className="od-close" onClick={onClose} aria-label="Close"><X size={20} /></button>
         </header>
 
         <div className="od-content">
@@ -227,7 +239,8 @@ export default function OwnerDashboard({ onClose }) {
         .od-orders{flex:1;overflow-y:auto;padding:1.2rem;display:flex;flex-direction:column;gap:1rem;}
         .od-order{border:1px solid rgba(48,66,54,.1);border-radius:16px;padding:1rem;background:#fff;}
         .od-order-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:.7rem;}
-        .od-cust{font-weight:600;font-size:1rem;}
+        .od-no{font-family:'Fraunces',Georgia,serif;font-weight:700;font-size:1.05rem;color:#6F8F62;margin-right:.6rem;}
+        .od-cust{font-weight:600;font-size:.95rem;}
         .od-time{font-size:.75rem;color:#9aa89a;margin-left:.5rem;}
         .od-badge{color:#fff;font-size:.72rem;font-weight:600;padding:.25rem .6rem;border-radius:999px;}
         .od-items{display:flex;flex-direction:column;gap:.5rem;margin-bottom:.8rem;}
