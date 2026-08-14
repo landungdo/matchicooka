@@ -3,6 +3,7 @@ import { supabase } from "../lib/supabase.js";
 import { useAuth } from "../lib/AuthContext.jsx";
 import { BUNNY_SVG } from "../data/assets.js";
 import { vnd, summaryLines } from "../data/menu.js";
+import MessageList from "./MessageList.jsx";
 import { X, Send, ShoppingBag, MessageSquare } from "lucide-react";
 
 const STATUS_LABEL = { received: "New", making: "Making", ready: "Ready", cancelled: "Cancelled" };
@@ -168,11 +169,7 @@ function MessagesTab({ ownerId }) {
         {sel && (
           <>
             <div className="od-thread-body">
-              {msgs.map((m) => (
-                <div key={m.id} className={"cd-msg " + (m.sender_role === "owner" ? "me" : "shop")}>
-                  <span className="cd-bubble">{m.body}</span>
-                </div>
-              ))}
+              <MessageList msgs={msgs} mineRole="owner" />
               <div ref={endRef} />
             </div>
             <div className="od-thread-foot">

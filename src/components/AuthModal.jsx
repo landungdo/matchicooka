@@ -14,8 +14,8 @@ export default function AuthModal({ onClose }) {
 
   const submit = async () => {
     setErr(""); setInfo("");
-    if (!email || !pw) { setErr("Nhập email và mật khẩu nhé."); return; }
-    if (pw.length < 6) { setErr("Mật khẩu tối thiểu 6 ký tự."); return; }
+    if (!email || !pw) { setErr("Please enter your email and password."); return; }
+    if (pw.length < 6) { setErr("Password must be at least 6 characters."); return; }
     setBusy(true);
     try {
       if (mode === "login") {
@@ -25,11 +25,11 @@ export default function AuthModal({ onClose }) {
       } else {
         const { data, error } = await signUp(email.trim(), pw, name.trim() || null);
         if (error) throw error;
-        if (data.session) onClose();                 // instant login (email confirmation off)
-        else setInfo("Tài khoản đã tạo! Kiểm tra email để xác nhận, rồi đăng nhập.");
+        if (data.session) onClose();
+        else setInfo("Account created! Check your email to confirm, then log in.");
       }
     } catch (e) {
-      setErr(e.message || "Có lỗi xảy ra, thử lại nhé.");
+      setErr(e.message || "Something went wrong, please try again.");
     } finally {
       setBusy(false);
     }
@@ -37,33 +37,33 @@ export default function AuthModal({ onClose }) {
 
   return (
     <div className="am-overlay" onClick={onClose}>
-      <div className="am-card" onClick={(e) => e.stopPropagation()}>
-        <button className="am-close" onClick={onClose} aria-label="Đóng">✕</button>
+      <div className="am-card" role="dialog" aria-modal="true" aria-label="Sign in" onClick={(e) => e.stopPropagation()}>
+        <button className="am-close" onClick={onClose} aria-label="Close">✕</button>
 
         <span className="am-bunny" dangerouslySetInnerHTML={{ __html: BUNNY_SVG }} />
-        <h2 className="am-title">{mode === "login" ? "Chào bạn quay lại!" : "Tạo tài khoản"}</h2>
+        <h2 className="am-title">{mode === "login" ? "Welcome back!" : "Create account"}</h2>
         <p className="am-sub">
-          {mode === "login" ? "Đăng nhập để đặt matcha và nhắn cho quán." : "Một chút thôi là xong ✿"}
+          {mode === "login" ? "Log in to order and message the shop." : "Just a sip away ✿"}
         </p>
 
         <div className="am-tabs">
-          <button className={"am-tab" + (mode === "login" ? " on" : "")} onClick={() => setMode("login")}>Đăng nhập</button>
-          <button className={"am-tab" + (mode === "signup" ? " on" : "")} onClick={() => setMode("signup")}>Đăng ký</button>
+          <button className={"am-tab" + (mode === "login" ? " on" : "")} onClick={() => setMode("login")}>Log in</button>
+          <button className={"am-tab" + (mode === "signup" ? " on" : "")} onClick={() => setMode("signup")}>Sign up</button>
         </div>
 
         <div className="am-form">
           {mode === "signup" && (
-            <input className="am-input" placeholder="Tên hiển thị" value={name} onChange={(e) => setName(e.target.value)} />
+            <input className="am-input" placeholder="Display name" value={name} onChange={(e) => setName(e.target.value)} />
           )}
           <input className="am-input" type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} />
-          <input className="am-input" type="password" placeholder="Mật khẩu (≥ 6 ký tự)" value={pw}
+          <input className="am-input" type="password" placeholder="Password (min 6 chars)" value={pw}
                  onChange={(e) => setPw(e.target.value)} onKeyDown={(e) => e.key === "Enter" && submit()} />
 
           {err && <div className="am-err">{err}</div>}
           {info && <div className="am-info">{info}</div>}
 
           <button className="am-submit" onClick={submit} disabled={busy}>
-            {busy ? "Đang xử lý…" : mode === "login" ? "Đăng nhập" : "Tạo tài khoản"}
+            {busy ? "Please wait…" : mode === "login" ? "Log in" : "Create account"}
           </button>
         </div>
       </div>
