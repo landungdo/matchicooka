@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { AuthProvider, useAuth } from "./lib/AuthContext.jsx";
 import { supabase } from "./lib/supabase.js";
 import { findP } from "./data/menu.js";
@@ -15,25 +15,37 @@ function Shell() {
   const [ownerOpen, setOwnerOpen] = useState(false);
   const [ordersOpen, setOrdersOpen] = useState(false);
   const [toast, setToast] = useState(null);
+  const placingRef = useRef(false); // guard against double-click checkout
 
   // Checkout -> create order + line items (schema v2).
   const placeOrder = async (cart) => {
     if (!user) { setAuthOpen(true); return false; }
-    const subtotal = cart.reduce((s, it) => s + it.price * it.qty, 0);
-    const { data: order, error } = await supabase
-      .from("orders").insert({ user_id: user.id, subtotal }).select().single();
-    if (error || !order) { console.error("[order]", error); return false; }
-    const rows = cart.map((it) => ({
-      order_id: order.id, user_id: user.id,
-      product_id: it.config.productId, product_name: findP(it.config.productId).name,
-      config: it.config, qty: it.qty, price: it.price,
-    }));
-    const { error: e2 } = await supabase.from("order_items").insert(rows);
-    if (e2) { console.error("[order_items]", e2); return false; }
-    return true;
+    if (placingRef.current) return false;   // already placing -> ignore
+    placingRef.current = true;
+    try {
+      const subtotal = cart.reduce((s, it) => s + it.price * it.qty, 0);
+      const { data: order, error } = await supabase
+        .from("orders").insert({ user_id: user.id, subtotal }).select().single();
+      if (error || !order) { console.error("[order]", error); return false; }
+
+      const rows = cart.map((it) => ({
+        order_id: order.id, user_id: user.id,
+        product_id: it.config.productId, product_name: findP(it.config.productId).name,
+        config: it.config, qty: it.qty, price: it.price,
+      }));
+      const { error: e2 } = await supabase.from("order_items").insert(rows);
+      if (e2) {
+        console.error("[order_items]", e2);
+        await supabase.from("orders").delete().eq("id", order.id); // clean up empty order
+        return false;
+      }
+      return true;
+    } finally {
+      placingRef.current = false;
+    }
   };
 
-  // Ready notification: toast when one of my orders turns "ready" (Mức 2).
+  // Ready notification: toast when one of my orders turns "ready".
   useEffect(() => {
     if (!user || isOwner) return;
     const notified = new Set();
@@ -80,9 +92,7 @@ function Shell() {
       {ownerOpen && <OwnerDashboard onClose={() => setOwnerOpen(false)} />}
       {authOpen && <AuthModal onClose={() => setAuthOpen(false)} />}
 
-      {toast && (
-        <div className="mxr-toast" onClick={() => setOrdersOpen(true)}>{toast}</div>
-      )}
+      {toast && (<div className="mxr-toast" onClick={() => setOrdersOpen(true)}>{toast}</div>)}
 
       <style>{`
         .mxr-ownerbtn{position:fixed;left:16px;bottom:16px;z-index:70;background:#304236;color:#F8F5ED;border:none;

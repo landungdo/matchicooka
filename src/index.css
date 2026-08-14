@@ -1,1 +1,16 @@
+/* matchicooka — global fixes
+   Bug: `.mx-root button{background:none}` (specificity 0,1,1) was overriding
+   single-class button backgrounds (0,1,0), so primary/ghost/soft/option
+   buttons rendered transparent. Re-assert them with higher specificity. */
 
+.mx-root .mx-btn-primary{ background:#6F8F62; color:#fff; }
+.mx-root .mx-btn-soft{ background:#DDE8D8; color:#6F8F62; }
+.mx-root .mx-btn-soft:hover{ background:#A9BFA0; color:#fff; }
+.mx-root .mx-btn-ghost{ background:#FCFBF7; }
+.mx-root .mx-cartbtn{ background:#F8F5ED; }
+.mx-root .mx-cartbtn:hover{ background:#DDE8D8; }
+.mx-root .mx-authchip{ background:#F8F5ED; }
+.mx-root .mx-steppill{ background:#F8F5ED; }
+.mx-root .mx-steppill:hover{ background:#DDE8D8; }
+.mx-root .mx-opt{ background:#FCFBF7; }
+.mx-root .mx-opt.sel{ background:#DDE8D8; }
