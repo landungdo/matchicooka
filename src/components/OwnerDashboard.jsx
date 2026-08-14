@@ -1,0 +1,280 @@
+import { useState, useEffect, useRef, useCallback } from "react";
+import { supabase } from "../lib/supabase.js";
+import { useAuth } from "../lib/AuthContext.jsx";
+import { BUNNY_SVG } from "../data/assets.js";
+import { vnd } from "../data/menu.js";
+import { X, Send, RefreshCw, ShoppingBag, MessageSquare } from "lucide-react";
+
+const STATUS_LABEL = { pending: "Chờ pha", making: "Đang pha", done: "Xong", cancelled: "Đã huỷ" };
+const STATUS_COLOR = { pending: "#9B8068", making: "#6F8F62", done: "#4c7a3f", cancelled: "#b06a6a" };
+const timeVN = (iso) => new Date(iso).toLocaleString("vi-VN", { hour: "2-digit", minute: "2-digit", day: "2-digit", month: "2-digit" });
+
+/* ---------------- Orders tab ---------------- */
+function OrdersTab() {
+  const [orders, setOrders] = useState([]);
+  const [names, setNames] = useState({});
+  const [loading, setLoading] = useState(true);
+
+  const load = useCallback(async () => {
+    const { data } = await supabase.from("orders").select("*").order("created_at", { ascending: false });
+    const rows = data || [];
+    setOrders(rows);
+    setLoading(false);
+    const ids = [...new Set(rows.map((o) => o.user_id))];
+    if (ids.length) {
+      const { data: profs } = await supabase.from("profiles").select("id, display_name").in("id", ids);
+      const map = {};
+      (profs || []).forEach((p) => (map[p.id] = p.display_name));
+      setNames(map);
+    }
+  }, []);
+
+  useEffect(() => {
+    load();
+    const ch = supabase.channel("owner-orders")
+      .on("postgres_changes", { event: "*", schema: "public", table: "orders" }, () => load())
+      .subscribe();
+    return () => supabase.removeChannel(ch);
+  }, [load]);
+
+  const setStatus = async (id, status) => {
+    setOrders((os) => os.map((o) => (o.id === id ? { ...o, status } : o)));
+    await supabase.from("orders").update({ status }).eq("id", id);
+  };
+
+  if (loading) return <div className="od-empty">Đang tải đơn…</div>;
+  if (!orders.length) return <div className="od-empty">Chưa có đơn nào. Đơn mới sẽ hiện ở đây theo thời gian thực.</div>;
+
+  return (
+    <div className="od-orders">
+      {orders.map((o) => (
+        <div key={o.id} className="od-order">
+          <div className="od-order-top">
+            <div>
+              <span className="od-cust">{names[o.user_id] || "Khách"}</span>
+              <span className="od-time">{timeVN(o.created_at)}</span>
+            </div>
+            <span className="od-badge" style={{ background: STATUS_COLOR[o.status] }}>{STATUS_LABEL[o.status]}</span>
+          </div>
+
+          <div className="od-items">
+            {(o.items || []).map((it, i) => (
+              <div key={i} className="od-item">
+                <span className="od-qty">{it.qty}×</span>
+                <div>
+                  <div className="od-item-name">{it.name || "Matcha"}</div>
+                  <div className="od-item-lines">{(it.lines || []).join(" · ")}</div>
+                </div>
+                <span className="od-item-price">{vnd(it.price * it.qty)}</span>
+              </div>
+            ))}
+          </div>
+
+          <div className="od-order-foot">
+            <span className="od-total">{vnd(o.subtotal)}</span>
+            <div className="od-actions">
+              {o.status === "pending" && <button className="od-btn go" onClick={() => setStatus(o.id, "making")}>Bắt đầu pha</button>}
+              {o.status === "making" && <button className="od-btn go" onClick={() => setStatus(o.id, "done")}>Xong đơn</button>}
+              {o.status !== "done" && o.status !== "cancelled" && (
+                <button className="od-btn cancel" onClick={() => setStatus(o.id, "cancelled")}>Huỷ</button>
+              )}
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/* ---------------- Messages tab ---------------- */
+function MessagesTab({ ownerId }) {
+  const [rooms, setRooms] = useState([]);
+  const [names, setNames] = useState({});
+  const [sel, setSel] = useState(null);
+  const [msgs, setMsgs] = useState([]);
+  const [text, setText] = useState("");
+  const endRef = useRef(null);
+
+  const loadRooms = useCallback(async () => {
+    const { data } = await supabase.from("messages").select("room_user_id, created_at").order("created_at", { ascending: false });
+    const seen = new Set(); const list = [];
+    (data || []).forEach((m) => { if (!seen.has(m.room_user_id)) { seen.add(m.room_user_id); list.push(m.room_user_id); } });
+    setRooms(list);
+    if (list.length) {
+      const { data: profs } = await supabase.from("profiles").select("id, display_name").in("id", list);
+      const map = {}; (profs || []).forEach((p) => (map[p.id] = p.display_name)); setNames(map);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadRooms();
+    const ch = supabase.channel("owner-rooms")
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages" }, () => loadRooms())
+      .subscribe();
+    return () => supabase.removeChannel(ch);
+  }, [loadRooms]);
+
+  useEffect(() => {
+    if (!sel) return;
+    let active = true;
+    (async () => {
+      const { data } = await supabase.from("messages").select("*").eq("room_user_id", sel).order("created_at", { ascending: true });
+      if (active) setMsgs(data || []);
+    })();
+    const ch = supabase.channel("owner-chat:" + sel)
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages", filter: `room_user_id=eq.${sel}` },
+        (p) => setMsgs((m) => (m.some((x) => x.id === p.new.id) ? m : [...m, p.new])))
+      .subscribe();
+    return () => { active = false; supabase.removeChannel(ch); };
+  }, [sel]);
+
+  useEffect(() => { setTimeout(() => endRef.current?.scrollIntoView({ behavior: "smooth" }), 50); }, [msgs]);
+
+  const send = async () => {
+    const body = text.trim();
+    if (!body || !sel) return;
+    setText("");
+    const { data, error } = await supabase.from("messages")
+      .insert({ room_user_id: sel, sender_id: ownerId, sender_role: "owner", body }).select().single();
+    if (!error && data) setMsgs((m) => (m.some((x) => x.id === data.id) ? m : [...m, data]));
+  };
+
+  return (
+    <div className="od-chat">
+      <div className="od-rooms">
+        {rooms.length === 0 && <div className="od-empty sm">Chưa có ai nhắn tin.</div>}
+        {rooms.map((r) => (
+          <button key={r} className={"od-room" + (sel === r ? " on" : "")} onClick={() => setSel(r)}>
+            <span className="od-room-ava" dangerouslySetInnerHTML={{ __html: BUNNY_SVG }} />
+            {names[r] || "Khách"}
+          </button>
+        ))}
+      </div>
+
+      <div className="od-thread">
+        {!sel && <div className="od-empty">Chọn một khách để trả lời.</div>}
+        {sel && (
+          <>
+            <div className="od-thread-body">
+              {msgs.map((m) => (
+                <div key={m.id} className={"cd-msg " + (m.sender_role === "owner" ? "me" : "shop")}>
+                  <span className="cd-bubble">{m.body}</span>
+                </div>
+              ))}
+              <div ref={endRef} />
+            </div>
+            <div className="od-thread-foot">
+              <input className="cd-input" placeholder="Trả lời khách…" value={text}
+                     onChange={(e) => setText(e.target.value)} onKeyDown={(e) => e.key === "Enter" && send()} />
+              <button className="cd-send" onClick={send} aria-label="Gửi"><Send size={17} /></button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ---------------- Shell ---------------- */
+export default function OwnerDashboard({ onClose }) {
+  const { user, name } = useAuth();
+  const [tab, setTab] = useState("orders");
+
+  return (
+    <div className="od-overlay">
+      <div className="od-panel">
+        <header className="od-head">
+          <span className="od-bunny" dangerouslySetInnerHTML={{ __html: BUNNY_SVG }} />
+          <div className="od-hi">
+            <div className="od-shop">matchicooka · quản lý</div>
+            <div className="od-owner">Xin chào {name}</div>
+          </div>
+          <div className="od-tabs">
+            <button className={"od-tab" + (tab === "orders" ? " on" : "")} onClick={() => setTab("orders")}>
+              <ShoppingBag size={15} /> Đơn hàng
+            </button>
+            <button className={"od-tab" + (tab === "chat" ? " on" : "")} onClick={() => setTab("chat")}>
+              <MessageSquare size={15} /> Tin nhắn
+            </button>
+          </div>
+          <button className="od-close" onClick={onClose} aria-label="Đóng"><X size={20} /></button>
+        </header>
+
+        <div className="od-content">
+          {tab === "orders" ? <OrdersTab /> : <MessagesTab ownerId={user.id} />}
+        </div>
+      </div>
+
+      <style>{`
+        .od-overlay{position:fixed;inset:0;z-index:90;background:rgba(48,66,54,.35);backdrop-filter:blur(4px);
+          display:grid;place-items:center;padding:1rem;font-family:Inter,system-ui,sans-serif;color:#304236;}
+        .od-panel{width:min(900px,96vw);height:min(720px,92vh);background:#FCFBF7;border-radius:24px;
+          display:flex;flex-direction:column;overflow:hidden;box-shadow:0 30px 70px rgba(48,66,54,.35);}
+        .od-head{display:flex;align-items:center;gap:.8rem;padding:1rem 1.2rem;background:#DDE8D8;flex-wrap:wrap;}
+        .od-bunny{width:42px;height:42px;flex-shrink:0;}.od-bunny svg{width:100%;height:100%;}
+        .od-shop{font-family:'Fraunces',Georgia,serif;font-weight:600;font-size:1.15rem;line-height:1;}
+        .od-owner{font-size:.78rem;color:#5b6b5f;margin-top:2px;}
+        .od-tabs{display:flex;gap:.4rem;margin-left:auto;background:rgba(255,255,255,.5);padding:.3rem;border-radius:12px;}
+        .od-tab{display:flex;align-items:center;gap:.4rem;border:none;background:none;padding:.5rem .9rem;border-radius:9px;
+          font-weight:600;font-size:.85rem;color:#5b6b5f;cursor:pointer;font-family:inherit;}
+        .od-tab.on{background:#FCFBF7;color:#6F8F62;box-shadow:0 2px 8px rgba(48,66,54,.1);}
+        .od-close{border:none;background:none;color:#5b6b5f;cursor:pointer;padding:4px;border-radius:8px;}
+        .od-close:hover{background:rgba(48,66,54,.1);}
+        .od-content{flex:1;overflow:hidden;display:flex;}
+        .od-empty{margin:auto;text-align:center;color:#8a988a;font-size:.95rem;padding:2rem;}
+        .od-empty.sm{font-size:.85rem;padding:1rem;}
+
+        .od-orders{flex:1;overflow-y:auto;padding:1.2rem;display:flex;flex-direction:column;gap:1rem;}
+        .od-order{border:1px solid rgba(48,66,54,.1);border-radius:16px;padding:1rem;background:#fff;}
+        .od-order-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:.7rem;}
+        .od-cust{font-weight:600;font-size:1rem;}
+        .od-time{font-size:.75rem;color:#9aa89a;margin-left:.5rem;}
+        .od-badge{color:#fff;font-size:.72rem;font-weight:600;padding:.25rem .6rem;border-radius:999px;}
+        .od-items{display:flex;flex-direction:column;gap:.5rem;margin-bottom:.8rem;}
+        .od-item{display:flex;align-items:flex-start;gap:.6rem;}
+        .od-qty{font-weight:700;color:#6F8F62;}
+        .od-item-name{font-weight:600;font-size:.92rem;}
+        .od-item-lines{font-size:.76rem;color:#8a988a;line-height:1.4;}
+        .od-item-price{margin-left:auto;font-weight:600;font-size:.88rem;}
+        .od-order-foot{display:flex;align-items:center;justify-content:space-between;border-top:1px solid rgba(48,66,54,.08);padding-top:.7rem;}
+        .od-total{font-weight:700;font-size:1.05rem;}
+        .od-actions{display:flex;gap:.5rem;}
+        .od-btn{border:none;padding:.5rem .9rem;border-radius:999px;font-weight:600;font-size:.82rem;cursor:pointer;font-family:inherit;}
+        .od-btn.go{background:#6F8F62;color:#fff;}
+        .od-btn.go:hover{background:#5E7D48;}
+        .od-btn.cancel{background:#F0EBDF;color:#9b6a6a;}
+        .od-btn.cancel:hover{background:#e8dccb;}
+
+        .od-chat{flex:1;display:flex;overflow:hidden;}
+        .od-rooms{width:200px;border-right:1px solid rgba(48,66,54,.1);overflow-y:auto;padding:.6rem;display:flex;flex-direction:column;gap:.3rem;}
+        .od-room{display:flex;align-items:center;gap:.5rem;padding:.6rem .7rem;border:none;background:none;border-radius:10px;
+          font-weight:500;font-size:.9rem;color:#304236;cursor:pointer;text-align:left;font-family:inherit;}
+        .od-room:hover{background:#F8F5ED;}
+        .od-room.on{background:#DDE8D8;color:#6F8F62;font-weight:600;}
+        .od-room-ava{width:26px;height:26px;flex-shrink:0;}.od-room-ava svg{width:100%;height:100%;}
+        .od-thread{flex:1;display:flex;flex-direction:column;}
+        .od-thread-body{flex:1;overflow-y:auto;padding:1rem;display:flex;flex-direction:column;gap:.55rem;}
+        .od-thread-foot{display:flex;gap:.5rem;padding:.7rem;border-top:1px solid rgba(48,66,54,.08);}
+        .cd-msg{display:flex;max-width:78%;}
+        .cd-msg.me{align-self:flex-end;}
+        .cd-msg.shop{align-self:flex-start;}
+        .cd-bubble{padding:.6rem .85rem;border-radius:16px;font-size:.9rem;line-height:1.4;word-break:break-word;}
+        .cd-msg.me .cd-bubble{background:#6F8F62;color:#fff;border-bottom-right-radius:5px;}
+        .cd-msg.shop .cd-bubble{background:#F0EBDF;color:#304236;border-bottom-left-radius:5px;}
+        .cd-input{flex:1;padding:.7rem .9rem;border-radius:999px;border:1.5px solid rgba(48,66,54,.14);
+          background:#F8F5ED;font-family:inherit;font-size:.9rem;color:#304236;}
+        .cd-input:focus{outline:none;border-color:#6F8F62;}
+        .cd-send{width:42px;height:42px;flex-shrink:0;border:none;border-radius:50%;background:#6F8F62;color:#fff;
+          display:grid;place-items:center;cursor:pointer;}
+        .cd-send:hover{background:#5E7D48;}
+
+        @media(max-width:640px){
+          .od-tabs{order:3;width:100%;margin-left:0;}
+          .od-chat{flex-direction:column;}
+          .od-rooms{width:100%;flex-direction:row;border-right:none;border-bottom:1px solid rgba(48,66,54,.1);}
+          .od-room{white-space:nowrap;}
+        }
+      `}</style>
+    </div>
+  );
+}
