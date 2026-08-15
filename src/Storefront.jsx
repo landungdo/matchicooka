@@ -14,6 +14,7 @@ import {
 
 /* ---------- Brand assets (compressed WebP data URIs) ---------- */
 import { ASSETS, BUNNY_SVG } from "./data/assets.js";
+import { supabase } from "./lib/supabase.js";
 
 /* ---------- Design tokens ---------- */
 const C = {
@@ -341,18 +342,25 @@ function Home({ go, onPreset, onCloud }) {
 /* ============================================================
    Menu / Saved
    ============================================================ */
-function Menu({ onCustomize }) {
+function Menu({ onCustomize, soldOut }) {
   return (
     <div className="mx-menu">
       <div className="mx-sec-head"><h2 className="mx-h2">Our Matcha</h2><p className="mx-sub">Seven house drinks. Every one fully customisable.</p></div>
       <div className="mx-menugrid">
-        {PRODUCTS.map((p) => (
-          <div key={p.id} className="mx-card mx-menucard">
-            <div className="mx-menuart"><DrinkPreview cfg={{ ...DEFAULT_CONFIG, productId: p.id }} size={150} /></div>
+        {PRODUCTS.map((p) => {
+          const out = soldOut && soldOut.has(p.id);
+          return (
+          <div key={p.id} className={"mx-card mx-menucard" + (out ? " mx-out" : "")}>
+            <div className="mx-menuart"><DrinkPreview cfg={{ ...DEFAULT_CONFIG, productId: p.id }} size={150} />{out && <span className="mx-out-tag">Sold out</span>}</div>
             <div className="mx-menu-name">{p.name}</div><p className="mx-menu-desc">{p.desc}</p>
-            <div className="mx-menu-foot"><span className="mx-from">From {vnd(p.base)}</span><button className="mx-btn mx-btn-soft" onClick={() => onCustomize(p.id)}>Customize</button></div>
+            <div className="mx-menu-foot"><span className="mx-from">From {vnd(p.base)}</span>
+              {out
+                ? <button className="mx-btn mx-btn-soft" disabled>Sold out</button>
+                : <button className="mx-btn mx-btn-soft" onClick={() => onCustomize(p.id)}>Customize</button>}
+            </div>
           </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
@@ -446,6 +454,21 @@ export default function Storefront({ user, name, onLogin, onLogout, onPlaceOrder
   const [cartOpen, setCartOpen] = useState(false);
   const [phone, setPhone] = useState("");
   const [note, setNote] = useState("");
+  const [soldOut, setSoldOut] = useState(() => new Set());
+
+  // Load which products are sold out (owner can toggle in the dashboard).
+  useEffect(() => {
+    let active = true;
+    const loadAvail = async () => {
+      const { data } = await supabase.from("menu_products").select("id, available");
+      if (active && data) setSoldOut(new Set(data.filter((p) => p.available === false).map((p) => p.id)));
+    };
+    loadAvail();
+    const ch = supabase.channel("menu-avail")
+      .on("postgres_changes", { event: "*", schema: "public", table: "menu_products" }, loadAvail)
+      .subscribe();
+    return () => { active = false; supabase.removeChannel(ch); };
+  }, []);
   const [toast, setToast] = useState(null);
 
   // Persist cart & saved recipes across refreshes (localStorage).
@@ -492,7 +515,7 @@ export default function Storefront({ user, name, onLogin, onLogout, onPlaceOrder
 
       <main className="mx-main">
         {view === "home" && <Home go={go} onPreset={usePreset} onCloud={buildCloud} />}
-        {view === "menu" && <Menu onCustomize={customizeProduct} />}
+        {view === "menu" && <Menu onCustomize={customizeProduct} soldOut={soldOut} />}
         {view === "build" && <BuildPage cfg={cfg} setCfg={setCfg} onAdd={addToCart} onSave={saveMatcha} />}
         {view === "saved" && <Saved items={saved} onOrder={startBuild} onRemove={(id) => setSaved((a) => a.filter((s) => s.id !== id))} />}
       </main>
@@ -607,6 +630,9 @@ h1,h2,h3{font-family:'Fraunces','Georgia',serif;font-weight:600;margin:0;letter-
 .mx-menu-name{font-family:'Fraunces',serif;font-size:1.22rem;}
 .mx-menu-desc{font-size:.88rem;color:rgba(48,66,54,.62);line-height:1.5;margin:.4rem 0 1rem;flex:1;}
 .mx-menu-foot{display:flex;align-items:center;justify-content:space-between;gap:.5rem;}
+.mx-menucard.mx-out{opacity:.72;}
+.mx-menuart{position:relative;}
+.mx-out-tag{position:absolute;top:8px;left:8px;background:#b06a6a;color:#fff;font-size:.7rem;font-weight:700;padding:.2rem .55rem;border-radius:999px;}
 .mx-from{font-weight:600;font-size:.95rem;}
 
 /* build */

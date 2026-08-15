@@ -55,12 +55,17 @@ function OrdersTab() {
     return () => supabase.removeChannel(ch);
   }, [load]);
 
-  const setStatus = async (id, next) => {
+  const setStatus = async (id, next, reason = null) => {
     setBusyId(id);
-    const { error } = await supabase.rpc("transition_order_status", { p_order: id, p_next: next });
+    const { error } = await supabase.rpc("transition_order_status", { p_order: id, p_next: next, p_reason: reason });
     setBusyId(null);
     if (error) { alert(error.message || "Couldn't update the order."); }
     load(); // reload authoritative state (also arrives via realtime)
+  };
+  const cancelWithReason = (id) => {
+    const r = window.prompt("Reason for cancelling? (optional, shown to the customer)");
+    if (r === null) return; // user hit cancel on the prompt
+    setStatus(id, "cancelled", r.trim() || null);
   };
 
   if (loading) return <div className="od-empty">Loading orders…</div>;
@@ -120,6 +125,7 @@ function OrdersTab() {
             ))}
           </div>
 
+          {o.status === "cancelled" && o.cancel_reason && <div className="od-cancel-reason">Cancelled: {o.cancel_reason}</div>}
           {reviews[o.id]?.comment && <div className="od-review-comment">“{reviews[o.id].comment}”</div>}
 
           <div className="od-order-foot">
@@ -129,7 +135,7 @@ function OrdersTab() {
               {o.status === "making" && <button className="od-btn go" disabled={busyId===o.id} onClick={() => setStatus(o.id, "ready")}>Mark ready</button>}
               {o.status === "ready" && <button className="od-btn go" disabled={busyId===o.id} onClick={() => setStatus(o.id, "completed")}>Picked up</button>}
               {(o.status === "received" || o.status === "making" || o.status === "ready") && (
-                <button className="od-btn cancel" disabled={busyId===o.id} onClick={() => setStatus(o.id, "cancelled")}>Cancel</button>
+                <button className="od-btn cancel" disabled={busyId===o.id} onClick={() => cancelWithReason(o.id)}>Cancel</button>
               )}
             </div>
           </div>
@@ -297,6 +303,7 @@ export default function OwnerDashboard({ onClose }) {
         .od-badges{display:flex;align-items:center;gap:.5rem;}
         .od-review-badge{display:inline-flex;align-items:center;gap:.25rem;font-size:.75rem;font-weight:700;color:#4c7a3f;background:#DDE8D8;padding:.2rem .5rem;border-radius:999px;}
         .od-review-comment{font-size:.82rem;color:#5b6b5f;font-style:italic;background:#F8F5ED;padding:.5rem .7rem;border-radius:10px;margin-bottom:.7rem;}
+        .od-cancel-reason{font-size:.8rem;color:#9b6a6a;background:#F7E3E3;padding:.5rem .7rem;border-radius:10px;margin-bottom:.7rem;}
         .od-items{display:flex;flex-direction:column;gap:.5rem;margin-bottom:.8rem;}
         .od-item{display:flex;align-items:flex-start;gap:.6rem;}
         .od-qty{font-weight:700;color:#6F8F62;}

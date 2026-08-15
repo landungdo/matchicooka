@@ -12,6 +12,7 @@ const PRESETS = [
 export default function ShopStatusControl() {
   const [s, setS] = useState(null);
   const [msg, setMsg] = useState("");
+  const [products, setProducts] = useState([]);
   const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState("");
 
@@ -19,6 +20,8 @@ export default function ShopStatusControl() {
     (async () => {
       const { data } = await supabase.from("shop_status").select("*").eq("id", 1).single();
       setS(data); setMsg(data?.message || "");
+      const { data: prods } = await supabase.from("menu_products").select("id, name, available").order("base");
+      setProducts(prods || []);
     })();
   }, []);
 
@@ -32,6 +35,12 @@ export default function ShopStatusControl() {
   };
 
   const saveMsg = () => apply({ message: msg.trim() || null });
+
+  const toggleProduct = async (id, next) => {
+    setProducts((ps) => ps.map((p) => (p.id === id ? { ...p, available: next } : p)));
+    const { error } = await supabase.from("menu_products").update({ available: next }).eq("id", id);
+    if (error) { alert(error.message || "Update failed"); }
+  };
 
   if (!s) return <div className="sc-wrap">Loading…</div>;
 
@@ -56,6 +65,18 @@ export default function ShopStatusControl() {
         <button className="sc-save" disabled={busy} onClick={saveMsg}>Save</button>
       </div>
 
+      <div className="sc-avail">
+        <div className="sc-avail-head">Menu availability</div>
+        {products.map((p) => (
+          <div key={p.id} className="sc-prow">
+            <span className={"sc-pname" + (p.available ? "" : " off")}>{p.name}</span>
+            <button className={"sc-toggle" + (p.available ? " on" : "")} onClick={() => toggleProduct(p.id, !p.available)}>
+              {p.available ? "Available" : "Sold out"}
+            </button>
+          </div>
+        ))}
+      </div>
+
       <style>{`
         .sc-wrap{flex:1;overflow-y:auto;padding:1.4rem;font-family:Inter,system-ui,sans-serif;color:#304236;}
         .sc-now{background:#F8F5ED;padding:.8rem 1rem;border-radius:12px;font-size:.9rem;margin-bottom:1.2rem;}
@@ -74,6 +95,13 @@ export default function ShopStatusControl() {
         .sc-input:focus{outline:none;border-color:#6F8F62;}
         .sc-save{border:none;background:#6F8F62;color:#fff;font-weight:600;padding:.7rem 1.2rem;border-radius:12px;cursor:pointer;font-family:inherit;}
         .sc-save:disabled{opacity:.5;}
+        .sc-avail{margin-top:1.6rem;border-top:1px solid rgba(48,66,54,.1);padding-top:1.2rem;}
+        .sc-avail-head{font-weight:700;font-size:.95rem;margin-bottom:.7rem;}
+        .sc-prow{display:flex;align-items:center;justify-content:space-between;padding:.5rem 0;border-bottom:1px solid rgba(48,66,54,.06);}
+        .sc-pname{font-size:.9rem;font-weight:500;}
+        .sc-pname.off{color:#b06a6a;text-decoration:line-through;}
+        .sc-toggle{border:1.5px solid rgba(48,66,54,.14);background:#FCFBF7;padding:.35rem .8rem;border-radius:999px;font-size:.8rem;font-weight:600;color:#8a988a;cursor:pointer;font-family:inherit;}
+        .sc-toggle.on{background:#DDE8D8;color:#4c7a3f;border-color:#a9bfa0;}
       `}</style>
     </div>
   );

@@ -19,6 +19,8 @@ function Shell() {
   const [toast, setToast] = useState(null);
   const placingRef = useRef(false); // guard against double-click checkout
   const [notice, setNotice] = useState(null);
+  const [newOrders, setNewOrders] = useState(0);
+  const [ownerToast, setOwnerToast] = useState(null);
 
   // Checkout -> create order + line items (schema v2).
   const placeOrder = async (cart, details = {}) => {
@@ -66,6 +68,32 @@ function Shell() {
     return () => supabase.removeChannel(ch);
   }, [user, isOwner]);
 
+  // Owner: alert on a new order even when the dashboard is closed (toast + beep + count).
+  useEffect(() => {
+    if (!isOwner) return;
+    const beep = () => {
+      try {
+        const Ctx = window.AudioContext || window.webkitAudioContext;
+        const a = new Ctx();
+        const o = a.createOscillator(); const g = a.createGain();
+        o.connect(g); g.connect(a.destination); o.type = "sine"; o.frequency.value = 880;
+        g.gain.setValueAtTime(0.0001, a.currentTime);
+        g.gain.exponentialRampToValueAtTime(0.2, a.currentTime + 0.01);
+        g.gain.exponentialRampToValueAtTime(0.0001, a.currentTime + 0.4);
+        o.start(); o.stop(a.currentTime + 0.42);
+      } catch {}
+    };
+    const ch = supabase.channel("owner-neworders")
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "orders" }, (p) => {
+        setNewOrders((n) => n + 1);
+        setOwnerToast(`New order ${p.new.order_no || ""}!`);
+        beep();
+        setTimeout(() => setOwnerToast(null), 6000);
+      })
+      .subscribe();
+    return () => supabase.removeChannel(ch);
+  }, [isOwner]);
+
   if (!ready) return null;
 
   return (
@@ -89,7 +117,7 @@ function Shell() {
         </>
       )}
       {isOwner && (
-        <button className="mxr-ownerbtn" onClick={() => setOwnerOpen(true)}>🐰 Manage shop</button>
+        <button className="mxr-ownerbtn" onClick={() => { setOwnerOpen(true); setNewOrders(0); }}>🐰 Manage shop{newOrders > 0 && <span className="mxr-count">{newOrders}</span>}</button>
       )}
 
       {confirm && (
@@ -103,12 +131,16 @@ function Shell() {
 
       {toast && (<div className="mxr-toast" onClick={() => setOrdersOpen(true)}>{toast}</div>)}
       {notice && (<div className="mxr-notice">{notice}</div>)}
+      {ownerToast && (<div className="mxr-ownertoast" onClick={() => { setOwnerOpen(true); setNewOrders(0); }}>🔔 {ownerToast}</div>)}
 
       <style>{`
         .mxr-ownerbtn{position:fixed;left:16px;bottom:16px;z-index:70;background:#304236;color:#F8F5ED;border:none;
           padding:.75rem 1.15rem;border-radius:999px;font-weight:600;font-size:.9rem;cursor:pointer;
           box-shadow:0 8px 20px rgba(48,66,54,.3);font-family:Inter,system-ui,sans-serif;transition:transform .18s;}
         .mxr-ownerbtn:hover{transform:translateY(-2px);}
+        .mxr-count{display:inline-grid;place-items:center;min-width:20px;height:20px;padding:0 5px;margin-left:.45rem;border-radius:999px;background:#d9534f;color:#fff;font-size:.75rem;font-weight:700;}
+        .mxr-ownertoast{position:fixed;left:16px;bottom:64px;z-index:96;background:#304236;color:#fff;padding:.75rem 1.1rem;border-radius:14px;font-weight:600;font-size:.9rem;font-family:Inter,system-ui,sans-serif;box-shadow:0 12px 30px rgba(48,66,54,.35);cursor:pointer;animation:mxr-pop2 .3s ease;}
+        @keyframes mxr-pop2{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
         .mxr-ordersbtn{position:fixed;right:18px;bottom:88px;z-index:70;display:inline-flex;align-items:center;gap:.4rem;
           background:#FCFBF7;color:#304236;border:1.5px solid rgba(48,66,54,.14);padding:.6rem 1rem;border-radius:999px;
           font-weight:600;font-size:.88rem;cursor:pointer;box-shadow:0 6px 16px rgba(48,66,54,.14);

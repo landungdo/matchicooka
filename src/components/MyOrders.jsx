@@ -129,6 +129,9 @@ export default function MyOrders({ onClose }) {
                   <span className="mo-badge" style={{ background: st.color }}>{st.label}</span>
                 </div>
                 <div className="mo-note">{st.note}</div>
+                {o.status === "cancelled" && o.cancel_reason && (
+                  <div className="mo-cancel-reason">Reason: {o.cancel_reason}</div>
+                )}
                 {o.est_ready_at && ACTIVE.includes(o.status) && (
                   <div className="mo-eta">Ready by ~{timeLabel(o.est_ready_at)}</div>
                 )}
@@ -185,6 +188,7 @@ export default function MyOrders({ onClose }) {
         .mo-cancel:hover{background:#F7E3E3;}
         .mo-note{font-size:.8rem;color:#8a988a;margin:.35rem 0 .4rem;}
         .mo-eta{font-size:.82rem;font-weight:600;color:#4c7a3f;margin-bottom:.6rem;}
+        .mo-cancel-reason{font-size:.8rem;color:#9b6a6a;background:#F7E3E3;padding:.45rem .7rem;border-radius:10px;margin-bottom:.6rem;}
         .mo-items{display:flex;flex-direction:column;gap:.45rem;margin-bottom:.7rem;}
         .mo-item{display:flex;align-items:flex-start;gap:.6rem;}
         .mo-qty{font-weight:700;color:#6F8F62;}
