@@ -62,7 +62,7 @@ function ReviewPanel({ order, items, existing, onDone }) {
   );
 }
 
-export default function MyOrders({ onClose }) {
+export default function MyOrders({ onClose, onReorder }) {
   const { user } = useAuth();
   const [orders, setOrders] = useState([]);
   const [items, setItems] = useState({});
@@ -158,6 +158,11 @@ export default function MyOrders({ onClose }) {
                 {o.status === "completed" && (items[o.id] || []).length > 0 && (
                   <ReviewPanel order={o} items={items[o.id]} existing={reviews[o.id]} onDone={load} />
                 )}
+                {!ACTIVE.includes(o.status) && (items[o.id] || []).length > 0 && onReorder && (
+                  <button className="mo-reorder" onClick={() => onReorder((items[o.id] || []).map((it) => ({ config: it.config, qty: it.qty })))}>
+                    Order again
+                  </button>
+                )}
               </div>
             );
           })}
@@ -186,6 +191,8 @@ export default function MyOrders({ onClose }) {
         .mo-cancel{margin-top:.6rem;width:100%;border:1.5px solid rgba(176,106,106,.4);background:none;color:#b06a6a;
           border-radius:999px;padding:.55rem;font-weight:600;font-size:.84rem;cursor:pointer;font-family:inherit;}
         .mo-cancel:hover{background:#F7E3E3;}
+        .mo-reorder{margin-top:.6rem;width:100%;border:none;background:#DDE8D8;color:#4c7a3f;border-radius:999px;padding:.55rem;font-weight:600;font-size:.84rem;cursor:pointer;font-family:inherit;}
+        .mo-reorder:hover{background:#A9BFA0;color:#fff;}
         .mo-note{font-size:.8rem;color:#8a988a;margin:.35rem 0 .4rem;}
         .mo-eta{font-size:.82rem;font-weight:600;color:#4c7a3f;margin-bottom:.6rem;}
         .mo-cancel-reason{font-size:.8rem;color:#9b6a6a;background:#F7E3E3;padding:.45rem .7rem;border-radius:10px;margin-bottom:.6rem;}

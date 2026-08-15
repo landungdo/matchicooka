@@ -11,7 +11,7 @@ import { Receipt } from "lucide-react";
 import ShopStatusBadge from "./components/ShopStatusBadge.jsx";
 
 function Shell() {
-  const { user, name, isOwner, signOut, ready } = useAuth();
+  const { user, name, isOwner, signOut, ready, profile } = useAuth();
   const [authOpen, setAuthOpen] = useState(false);
   const [ownerOpen, setOwnerOpen] = useState(false);
   const [ordersOpen, setOrdersOpen] = useState(false);
@@ -21,6 +21,7 @@ function Shell() {
   const [notice, setNotice] = useState(null);
   const [newOrders, setNewOrders] = useState(0);
   const [ownerToast, setOwnerToast] = useState(null);
+  const [reorder, setReorder] = useState(null);
 
   // Checkout -> create order + line items (schema v2).
   const placeOrder = async (cart, details = {}) => {
@@ -102,6 +103,9 @@ function Shell() {
       <Storefront
         user={user}
         name={name}
+        defaultPhone={profile?.phone || ""}
+        reorderItems={reorder}
+        onReordered={() => setReorder(null)}
         onLogin={() => setAuthOpen(true)}
         onLogout={signOut}
         onPlaceOrder={placeOrder}
@@ -125,7 +129,7 @@ function Shell() {
           onTrack={() => { setConfirm(null); setOrdersOpen(true); }}
           onClose={() => setConfirm(null)} />
       )}
-      {ordersOpen && <MyOrders onClose={() => setOrdersOpen(false)} />}
+      {ordersOpen && <MyOrders onClose={() => setOrdersOpen(false)} onReorder={(items) => { setReorder(items); setOrdersOpen(false); }} />}
       {ownerOpen && <OwnerDashboard onClose={() => setOwnerOpen(false)} />}
       {authOpen && <AuthModal onClose={() => setAuthOpen(false)} />}
 

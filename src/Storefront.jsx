@@ -446,15 +446,30 @@ function CartDrawer({ open, onClose, items, setItems, onCheckout, phone, setPhon
 /* ============================================================
    App shell
    ============================================================ */
-export default function Storefront({ user, name, onLogin, onLogout, onPlaceOrder, onRequireLogin }) {
+export default function Storefront({ user, name, defaultPhone = "", reorderItems, onReordered, onLogin, onLogout, onPlaceOrder, onRequireLogin }) {
   const [view, setView] = useState("home");
   const [cfg, setCfg] = useState(DEFAULT_CONFIG);
   const [cart, setCart] = useState(() => loadLS("mx_cart", []));
   const [saved, setSaved] = useState(() => loadLS("mx_saved", []));
   const [cartOpen, setCartOpen] = useState(false);
-  const [phone, setPhone] = useState("");
+  const [phone, setPhone] = useState(defaultPhone || "");
   const [note, setNote] = useState("");
   const [soldOut, setSoldOut] = useState(() => new Set());
+
+  // Prefill phone from the saved profile once it loads (only if the field is empty).
+  useEffect(() => { if (defaultPhone) setPhone((cur) => cur || defaultPhone); }, [defaultPhone]);
+
+  // Reorder: inject items from a past order into the cart.
+  useEffect(() => {
+    if (reorderItems && reorderItems.length) {
+      setCart((a) => [
+        ...a,
+        ...reorderItems.map((r) => ({ id: Date.now() + "-" + Math.random().toString(36).slice(2), config: { ...r.config }, qty: r.qty || 1, price: priceOf(r.config) })),
+      ]);
+      setCartOpen(true);
+      onReordered && onReordered();
+    }
+  }, [reorderItems]);
 
   // Load which products are sold out (owner can toggle in the dashboard).
   useEffect(() => {
