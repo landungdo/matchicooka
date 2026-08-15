@@ -6,7 +6,8 @@ import { vnd, summaryLines } from "../data/menu.js";
 import MessageList from "./MessageList.jsx";
 import StarRating from "./StarRating.jsx";
 import ShopStatusControl from "./ShopStatusControl.jsx";
-import { X, Send, ShoppingBag, MessageSquare, Store } from "lucide-react";
+import Analytics from "./Analytics.jsx";
+import { X, Send, ShoppingBag, MessageSquare, Store, BarChart3 } from "lucide-react";
 
 const STATUS_LABEL = { received: "New", making: "Making", ready: "Ready", completed: "Picked up", cancelled: "Cancelled" };
 const STATUS_COLOR = { received: "#9B8068", making: "#6F8F62", ready: "#4c7a3f", completed: "#7a8a72", cancelled: "#b06a6a" };
@@ -254,6 +255,9 @@ export default function OwnerDashboard({ onClose }) {
             <button className={"od-tab" + (tab === "shop" ? " on" : "")} onClick={() => setTab("shop")}>
               <Store size={15} /> Shop
             </button>
+            <button className={"od-tab" + (tab === "insights" ? " on" : "")} onClick={() => setTab("insights")}>
+              <BarChart3 size={15} /> Insights
+            </button>
           </div>
           <button className="od-close" onClick={onClose} aria-label="Close"><X size={20} /></button>
         </header>
@@ -262,6 +266,7 @@ export default function OwnerDashboard({ onClose }) {
           {tab === "orders" && <OrdersTab />}
           {tab === "chat" && <MessagesTab ownerId={user.id} />}
           {tab === "shop" && <ShopStatusControl />}
+          {tab === "insights" && <Analytics />}
         </div>
       </div>
 
