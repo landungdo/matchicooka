@@ -5,7 +5,8 @@ import { BUNNY_SVG } from "../data/assets.js";
 import { vnd, summaryLines } from "../data/menu.js";
 import MessageList from "./MessageList.jsx";
 import StarRating from "./StarRating.jsx";
-import { X, Send, ShoppingBag, MessageSquare } from "lucide-react";
+import ShopStatusControl from "./ShopStatusControl.jsx";
+import { X, Send, ShoppingBag, MessageSquare, Store } from "lucide-react";
 
 const STATUS_LABEL = { received: "New", making: "Making", ready: "Ready", completed: "Picked up", cancelled: "Cancelled" };
 const STATUS_COLOR = { received: "#9B8068", making: "#6F8F62", ready: "#4c7a3f", completed: "#7a8a72", cancelled: "#b06a6a" };
@@ -20,6 +21,7 @@ function OrdersTab() {
   const [reviews, setReviews] = useState({});
   const [q, setQ] = useState("");
   const [statusF, setStatusF] = useState("all");
+  const [busyId, setBusyId] = useState(null);
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
@@ -53,13 +55,12 @@ function OrdersTab() {
     return () => supabase.removeChannel(ch);
   }, [load]);
 
-  const setStatus = async (id, status) => {
-    const patch = { status };
-    if (status === "making") patch.making_at = new Date().toISOString();
-    if (status === "ready") patch.ready_at = new Date().toISOString();
-    if (status === "completed") patch.completed_at = new Date().toISOString();
-    setOrders((os) => os.map((o) => (o.id === id ? { ...o, ...patch } : o)));
-    await supabase.from("orders").update(patch).eq("id", id);
+  const setStatus = async (id, next) => {
+    setBusyId(id);
+    const { error } = await supabase.rpc("transition_order_status", { p_order: id, p_next: next });
+    setBusyId(null);
+    if (error) { alert(error.message || "Couldn't update the order."); }
+    load(); // reload authoritative state (also arrives via realtime)
   };
 
   if (loading) return <div className="od-empty">Loading orders…</div>;
@@ -124,11 +125,11 @@ function OrdersTab() {
           <div className="od-order-foot">
             <span className="od-total">{vnd(o.subtotal)}</span>
             <div className="od-actions">
-              {o.status === "received" && <button className="od-btn go" onClick={() => setStatus(o.id, "making")}>Start making</button>}
-              {o.status === "making" && <button className="od-btn go" onClick={() => setStatus(o.id, "ready")}>Mark ready</button>}
-              {o.status === "ready" && <button className="od-btn go" onClick={() => setStatus(o.id, "completed")}>Picked up</button>}
-              {o.status !== "ready" && o.status !== "cancelled" && (
-                <button className="od-btn cancel" onClick={() => setStatus(o.id, "cancelled")}>Cancel</button>
+              {o.status === "received" && <button className="od-btn go" disabled={busyId===o.id} onClick={() => setStatus(o.id, "making")}>Start making</button>}
+              {o.status === "making" && <button className="od-btn go" disabled={busyId===o.id} onClick={() => setStatus(o.id, "ready")}>Mark ready</button>}
+              {o.status === "ready" && <button className="od-btn go" disabled={busyId===o.id} onClick={() => setStatus(o.id, "completed")}>Picked up</button>}
+              {(o.status === "received" || o.status === "making" || o.status === "ready") && (
+                <button className="od-btn cancel" disabled={busyId===o.id} onClick={() => setStatus(o.id, "cancelled")}>Cancel</button>
               )}
             </div>
           </div>
@@ -244,12 +245,17 @@ export default function OwnerDashboard({ onClose }) {
             <button className={"od-tab" + (tab === "chat" ? " on" : "")} onClick={() => setTab("chat")}>
               <MessageSquare size={15} /> Messages
             </button>
+            <button className={"od-tab" + (tab === "shop" ? " on" : "")} onClick={() => setTab("shop")}>
+              <Store size={15} /> Shop
+            </button>
           </div>
           <button className="od-close" onClick={onClose} aria-label="Close"><X size={20} /></button>
         </header>
 
         <div className="od-content">
-          {tab === "orders" ? <OrdersTab /> : <MessagesTab ownerId={user.id} />}
+          {tab === "orders" && <OrdersTab />}
+          {tab === "chat" && <MessagesTab ownerId={user.id} />}
+          {tab === "shop" && <ShopStatusControl />}
         </div>
       </div>
 
@@ -303,6 +309,7 @@ export default function OwnerDashboard({ onClose }) {
         .od-btn{border:none;padding:.5rem .9rem;border-radius:999px;font-weight:600;font-size:.82rem;cursor:pointer;font-family:inherit;}
         .od-btn.go{background:#6F8F62;color:#fff;}
         .od-btn.go:hover{background:#5E7D48;}
+        .od-btn:disabled{opacity:.5;cursor:not-allowed;}
         .od-btn.cancel{background:#F0EBDF;color:#9b6a6a;}
         .od-btn.cancel:hover{background:#e8dccb;}
 

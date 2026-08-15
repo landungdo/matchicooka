@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { supabase } from "../lib/supabase.js";
 import { useAuth } from "../lib/AuthContext.jsx";
 import { vnd, summaryLines } from "../data/menu.js";
-import { dateTimeLabel } from "../lib/time.js";
+import { dateTimeLabel, timeLabel } from "../lib/time.js";
 import StarRating from "./StarRating.jsx";
 import { X } from "lucide-react";
 
@@ -117,6 +117,9 @@ export default function MyOrders({ onClose }) {
             </div>
           )}
 
+          {!loading && orders.length > 0 && orders.filter((o) => tab === "active" ? ACTIVE.includes(o.status) : !ACTIVE.includes(o.status)).length === 0 && (
+            <div className="mo-empty">{tab === "active" ? "No active orders right now." : "You don't have any past orders yet."}</div>
+          )}
           {orders.filter((o) => tab === "active" ? ACTIVE.includes(o.status) : !ACTIVE.includes(o.status)).map((o) => {
             const st = STATUS[o.status] || STATUS.received;
             return (
@@ -126,6 +129,9 @@ export default function MyOrders({ onClose }) {
                   <span className="mo-badge" style={{ background: st.color }}>{st.label}</span>
                 </div>
                 <div className="mo-note">{st.note}</div>
+                {o.est_ready_at && ACTIVE.includes(o.status) && (
+                  <div className="mo-eta">Ready by ~{timeLabel(o.est_ready_at)}</div>
+                )}
                 <div className="mo-items">
                   {(items[o.id] || []).map((it) => (
                     <div key={it.id} className="mo-item">
@@ -146,7 +152,7 @@ export default function MyOrders({ onClose }) {
                   <button className="mo-cancel" onClick={() => cancelOrder(o.id)}>Cancel order</button>
                 )}
 
-                {o.status === "ready" && (items[o.id] || []).length > 0 && (
+                {o.status === "completed" && (items[o.id] || []).length > 0 && (
                   <ReviewPanel order={o} items={items[o.id]} existing={reviews[o.id]} onDone={load} />
                 )}
               </div>
@@ -177,7 +183,8 @@ export default function MyOrders({ onClose }) {
         .mo-cancel{margin-top:.6rem;width:100%;border:1.5px solid rgba(176,106,106,.4);background:none;color:#b06a6a;
           border-radius:999px;padding:.55rem;font-weight:600;font-size:.84rem;cursor:pointer;font-family:inherit;}
         .mo-cancel:hover{background:#F7E3E3;}
-        .mo-note{font-size:.8rem;color:#8a988a;margin:.35rem 0 .7rem;}
+        .mo-note{font-size:.8rem;color:#8a988a;margin:.35rem 0 .4rem;}
+        .mo-eta{font-size:.82rem;font-weight:600;color:#4c7a3f;margin-bottom:.6rem;}
         .mo-items{display:flex;flex-direction:column;gap:.45rem;margin-bottom:.7rem;}
         .mo-item{display:flex;align-items:flex-start;gap:.6rem;}
         .mo-qty{font-weight:700;color:#6F8F62;}

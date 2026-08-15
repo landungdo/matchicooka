@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { AuthProvider, useAuth } from "./lib/AuthContext.jsx";
 import { supabase } from "./lib/supabase.js";
-import { findP } from "./data/menu.js";
 import AuthModal from "./components/AuthModal.jsx";
 import Storefront from "./Storefront.jsx";
 import ChatDock from "./components/ChatDock.jsx";
@@ -9,6 +8,7 @@ import OwnerDashboard from "./components/OwnerDashboard.jsx";
 import MyOrders from "./components/MyOrders.jsx";
 import OrderConfirm from "./components/OrderConfirm.jsx";
 import { Receipt } from "lucide-react";
+import ShopStatusBadge from "./components/ShopStatusBadge.jsx";
 
 function Shell() {
   const { user, name, isOwner, signOut, ready } = useAuth();
@@ -18,6 +18,7 @@ function Shell() {
   const [confirm, setConfirm] = useState(null);
   const [toast, setToast] = useState(null);
   const placingRef = useRef(false); // guard against double-click checkout
+  const [notice, setNotice] = useState(null);
 
   // Checkout -> create order + line items (schema v2).
   const placeOrder = async (cart, details = {}) => {
@@ -25,25 +26,22 @@ function Shell() {
     if (placingRef.current) return false;   // already placing -> ignore
     placingRef.current = true;
     try {
-      const subtotal = cart.reduce((s, it) => s + it.price * it.qty, 0);
-      const { data: order, error } = await supabase
-        .from("orders")
-        .insert({ user_id: user.id, subtotal, phone: details.phone || null, note: details.note || null })
-        .select().single();
-      if (error || !order) { console.error("[order]", error); return false; }
-
-      const rows = cart.map((it) => ({
-        order_id: order.id, user_id: user.id,
-        product_id: it.config.productId, product_name: findP(it.config.productId).name,
-        config: it.config, qty: it.qty, price: it.price,
-      }));
-      const { error: e2 } = await supabase.from("order_items").insert(rows);
-      if (e2) {
-        console.error("[order_items]", e2);
-        await supabase.from("orders").delete().eq("id", order.id); // clean up empty order
+      // Server computes prices atomically (place_order RPC); client sends config+qty only.
+      const p_items = cart.map((it) => ({ config: it.config, qty: it.qty }));
+      const { data, error } = await supabase.rpc("place_order", {
+        p_items, p_phone: details.phone || "", p_note: details.note || "",
+      });
+      if (error || !data) {
+        console.error("[place_order]", error);
+        setNotice(error?.message || "Couldn't place order. Try again.");
+        setTimeout(() => setNotice(null), 5000);
         return false;
       }
-      setConfirm({ order_no: order.order_no, subtotal, count: cart.reduce((a, it) => a + it.qty, 0) });
+      setConfirm({
+        order_no: data.order_no, subtotal: data.subtotal,
+        count: cart.reduce((a, it) => a + it.qty, 0),
+        est_ready_at: data.est_ready_at, est_min: data.est_min, est_max: data.est_max,
+      });
       return true;
     } finally {
       placingRef.current = false;
@@ -72,6 +70,7 @@ function Shell() {
 
   return (
     <>
+      <ShopStatusBadge />
       <Storefront
         user={user}
         name={name}
@@ -103,6 +102,7 @@ function Shell() {
       {authOpen && <AuthModal onClose={() => setAuthOpen(false)} />}
 
       {toast && (<div className="mxr-toast" onClick={() => setOrdersOpen(true)}>{toast}</div>)}
+      {notice && (<div className="mxr-notice">{notice}</div>)}
 
       <style>{`
         .mxr-ownerbtn{position:fixed;left:16px;bottom:16px;z-index:70;background:#304236;color:#F8F5ED;border:none;
@@ -118,6 +118,7 @@ function Shell() {
           background:#4c7a3f;color:#fff;padding:.9rem 1.4rem;border-radius:999px;font-weight:600;font-size:.92rem;
           font-family:Inter,system-ui,sans-serif;box-shadow:0 12px 30px rgba(48,66,54,.35);animation:mxr-pop .3s ease;}
         @keyframes mxr-pop{from{opacity:0;transform:translateX(-50%) translateY(12px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
+        .mxr-notice{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);z-index:96;background:#9B4444;color:#fff;padding:.85rem 1.3rem;border-radius:999px;font-weight:600;font-size:.9rem;font-family:Inter,system-ui,sans-serif;box-shadow:0 12px 30px rgba(48,66,54,.35);animation:mxr-pop .3s ease;max-width:92vw;text-align:center;}
       `}</style>
     </>
   );

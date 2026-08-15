@@ -1,5 +1,6 @@
 import { BUNNY_SVG } from "../data/assets.js";
 import { vnd } from "../data/menu.js";
+import { timeLabel } from "../lib/time.js";
 import { Check } from "lucide-react";
 
 export default function OrderConfirm({ order, onTrack, onClose }) {
@@ -14,6 +15,9 @@ export default function OrderConfirm({ order, onTrack, onClose }) {
 
         <div className="oc-row"><span>Items</span><span>{order.count}</span></div>
         <div className="oc-row"><span>Total</span><span className="oc-total">{vnd(order.subtotal)}</span></div>
+        {order.est_ready_at && (
+          <div className="oc-row"><span>Ready by</span><span>~{timeLabel(order.est_ready_at)}{order.est_min ? ` (${order.est_min}–${order.est_max} min)` : ""}</span></div>
+        )}
         <div className="oc-row"><span>Payment</span><span>Pay at counter</span></div>
 
         <button className="oc-btn primary" onClick={onTrack}>Track my order</button>
