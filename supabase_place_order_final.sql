@@ -26,6 +26,11 @@ declare
 begin
   if auth.uid() is null then raise exception 'Not signed in'; end if;
 
+  -- request id, when provided, must be a UUID
+  if p_request_id is not null and p_request_id <> '' and
+     p_request_id !~ '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
+  then raise exception 'Invalid request id'; end if;
+
   -- idempotency: same request id -> return the existing order, don't duplicate
   if p_request_id is not null and length(p_request_id) > 0 then
     select id into v_existing from public.orders

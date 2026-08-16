@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import {
   ShoppingBag, Leaf, Check, Plus, Minus, X, Heart, Sparkles, ArrowRight, Trash2,
 } from "lucide-react";
@@ -72,6 +72,7 @@ const findP = (id) => PRODUCTS.find((p) => p.id === id) || PRODUCTS[0];
 const vnd = (n) => n.toLocaleString("vi-VN") + "đ";
 const loadLS = (k, fallback) => { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : fallback; } catch { return fallback; } };
 const saveLS = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} };
+const uuid = () => (crypto?.randomUUID && crypto.randomUUID()) || "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => { const r = (Math.random() * 16) | 0; return (c === "x" ? r : (r & 0x3) | 0x8).toString(16); });
 function priceOf(cfg) {
   let t = findP(cfg.productId).base;
   t += MILKS.find((m) => m.id === cfg.milk)?.price || 0;
@@ -463,7 +464,6 @@ export default function Storefront({ user, name, defaultPhone = "", reorderItems
   const [phone, setPhone] = useState(defaultPhone || "");
   const [note, setNote] = useState("");
   const [soldOut, setSoldOut] = useState(() => new Set());
-  const checkoutIdRef = useRef(null);
 
   // Prefill phone from the saved profile once it loads (only if the field is empty).
   useEffect(() => { if (defaultPhone) setPhone((cur) => cur || defaultPhone); }, [defaultPhone]);
@@ -511,9 +511,10 @@ export default function Storefront({ user, name, defaultPhone = "", reorderItems
   const checkout = async () => {
     if (onPlaceOrder) {
       if (!user) { onRequireLogin && onRequireLogin(); return; }
-      if (!checkoutIdRef.current) checkoutIdRef.current = (crypto?.randomUUID && crypto.randomUUID()) || (Date.now() + "-" + Math.random().toString(36).slice(2));
-      const ok = await onPlaceOrder(cart, { phone: phone.trim(), note: note.trim(), requestId: checkoutIdRef.current });
-      if (ok) { setCart([]); setCartOpen(false); setPhone(""); setNote(""); checkoutIdRef.current = null; }   // App shows the confirmation screen
+      let cid = loadLS("mx_checkout_id", null);
+      if (!cid) { cid = uuid(); saveLS("mx_checkout_id", cid); }   // stable across refresh until the order succeeds
+      const ok = await onPlaceOrder(cart, { phone: phone.trim(), note: note.trim(), requestId: cid });
+      if (ok) { setCart([]); setCartOpen(false); setPhone(""); setNote(""); try { localStorage.removeItem("mx_checkout_id"); } catch {} }
       else { ping(t("toast.failed")); }  // keep the same id so a retry is idempotent
     } else { setCart([]); setCartOpen(false); ping(t("toast.placed")); }
   };
