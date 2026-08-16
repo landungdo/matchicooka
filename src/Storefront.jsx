@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   ShoppingBag, Leaf, Check, Plus, Minus, X, Heart, Sparkles, ArrowRight, Trash2,
 } from "lucide-react";
@@ -463,6 +463,7 @@ export default function Storefront({ user, name, defaultPhone = "", reorderItems
   const [phone, setPhone] = useState(defaultPhone || "");
   const [note, setNote] = useState("");
   const [soldOut, setSoldOut] = useState(() => new Set());
+  const checkoutIdRef = useRef(null);
 
   // Prefill phone from the saved profile once it loads (only if the field is empty).
   useEffect(() => { if (defaultPhone) setPhone((cur) => cur || defaultPhone); }, [defaultPhone]);
@@ -510,9 +511,10 @@ export default function Storefront({ user, name, defaultPhone = "", reorderItems
   const checkout = async () => {
     if (onPlaceOrder) {
       if (!user) { onRequireLogin && onRequireLogin(); return; }
-      const ok = await onPlaceOrder(cart, { phone: phone.trim(), note: note.trim() });
-      if (ok) { setCart([]); setCartOpen(false); setPhone(""); setNote(""); }   // App shows the confirmation screen
-      else { ping(t("toast.failed")); }
+      if (!checkoutIdRef.current) checkoutIdRef.current = (crypto?.randomUUID && crypto.randomUUID()) || (Date.now() + "-" + Math.random().toString(36).slice(2));
+      const ok = await onPlaceOrder(cart, { phone: phone.trim(), note: note.trim(), requestId: checkoutIdRef.current });
+      if (ok) { setCart([]); setCartOpen(false); setPhone(""); setNote(""); checkoutIdRef.current = null; }   // App shows the confirmation screen
+      else { ping(t("toast.failed")); }  // keep the same id so a retry is idempotent
     } else { setCart([]); setCartOpen(false); ping(t("toast.placed")); }
   };
 

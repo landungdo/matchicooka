@@ -34,7 +34,7 @@ function Shell() {
     try {
       // Server computes prices atomically (place_order RPC); client sends config+qty only.
       const p_items = cart.map((it) => ({ config: it.config, qty: it.qty }));
-      const reqId = (crypto?.randomUUID && crypto.randomUUID()) || (Date.now() + "-" + Math.random().toString(36).slice(2));
+      const reqId = details.requestId || ((crypto?.randomUUID && crypto.randomUUID()) || (Date.now() + "-" + Math.random().toString(36).slice(2)));
       const { data, error } = await supabase.rpc("place_order", {
         p_items, p_phone: details.phone || "", p_note: details.note || "", p_request_id: reqId,
       });
@@ -71,7 +71,7 @@ function Shell() {
         })
       .subscribe();
     return () => supabase.removeChannel(ch);
-  }, [user, isOwner]);
+  }, [user, isOwner, t]);
 
   // Owner: alert on a new order even when the dashboard is closed (toast + beep + count).
   useEffect(() => {
@@ -97,7 +97,7 @@ function Shell() {
       })
       .subscribe();
     return () => supabase.removeChannel(ch);
-  }, [isOwner]);
+  }, [isOwner, t]);
 
   if (!ready) return null;
 

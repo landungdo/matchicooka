@@ -46,9 +46,17 @@ begin
   v_min := coalesce(v_min,10); v_max := coalesce(v_max,15);
   v_ready := now() + (v_max || ' minutes')::interval;
 
-  insert into public.orders (user_id, subtotal, phone, note, est_min, est_max, est_ready_at, client_request_id)
-  values (auth.uid(), 0, p_phone, nullif(p_note,''), v_min, v_max, v_ready, nullif(p_request_id,''))
-  returning id into v_order;
+  begin
+    insert into public.orders (user_id, subtotal, phone, note, est_min, est_max, est_ready_at, client_request_id)
+    values (auth.uid(), 0, p_phone, nullif(p_note,''), v_min, v_max, v_ready, nullif(p_request_id,''))
+    returning id into v_order;
+  exception when unique_violation then
+    -- a concurrent request with the same client_request_id won: return that order
+    select id into v_existing from public.orders
+     where user_id = auth.uid() and client_request_id = p_request_id;
+    return (select row_to_json(o) from
+      (select id, order_no, subtotal, est_min, est_max, est_ready_at from public.orders where id = v_existing) o);
+  end;
 
   for v_it in select * from jsonb_array_elements(p_items) loop
     v_cfg := v_it->'config';

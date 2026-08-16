@@ -113,7 +113,7 @@ function OrdersTab() {
           </div>
           {(o.phone || o.note) && (
             <div className="od-contact">
-              {o.phone && <span className="od-phone" style={{ cursor: "pointer" }} onClick={() => setRevealed((r) => { const n = new Set(r); n.has(o.id) ? n.delete(o.id) : n.add(o.id); return n; })} title="Tap to reveal">☎ {revealed.has(o.id) ? o.phone : maskPhone(o.phone)}</span>}
+              {o.phone && <button type="button" className="od-phone" aria-expanded={revealed.has(o.id)} onClick={() => setRevealed((r) => { const n = new Set(r); n.has(o.id) ? n.delete(o.id) : n.add(o.id); return n; })} title={t("od.revealPhone")}>☎ {revealed.has(o.id) ? o.phone : maskPhone(o.phone)}</button>}
               {o.note && <span className="od-ordernote">“{o.note}”</span>}
             </div>
           )}
@@ -304,7 +304,8 @@ export default function OwnerDashboard({ onClose }) {
         .od-chip{border:1.5px solid rgba(48,66,54,.12);background:none;padding:.35rem .8rem;border-radius:999px;font-size:.8rem;font-weight:600;color:#5b6b5f;cursor:pointer;font-family:inherit;}
         .od-chip.on{background:#6F8F62;color:#fff;border-color:#6F8F62;}
         .od-contact{display:flex;gap:.7rem;flex-wrap:wrap;margin:-.2rem 0 .7rem;font-size:.8rem;}
-        .od-phone{font-weight:600;color:#304236;}
+        .od-phone{font-weight:600;color:#304236;border:none;background:none;padding:0;cursor:pointer;font-family:inherit;font-size:inherit;}
+        .od-phone:hover{color:#6F8F62;}
         .od-ordernote{color:#5b6b5f;font-style:italic;}
         .od-order{border:1px solid rgba(48,66,54,.1);border-radius:16px;padding:1rem;background:#fff;}
         .od-order-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:.7rem;}
