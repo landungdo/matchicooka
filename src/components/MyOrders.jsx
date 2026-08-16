@@ -5,18 +5,17 @@ import { vnd, summaryLines } from "../data/menu.js";
 import { dateTimeLabel, timeLabel } from "../lib/time.js";
 import StarRating from "./StarRating.jsx";
 import { X } from "lucide-react";
+import { useLang } from "../lib/i18n.jsx";
 
 const STATUS = {
-  received:  { label: "Received",              color: "#9B8068", note: "We've got your order." },
-  making:    { label: "Making your drink",     color: "#6F8F62", note: "Sit tight, it's being whisked." },
-  ready:     { label: "Ready — come pick up ☕", color: "#4c7a3f", note: "Your matcha is ready at the counter!" },
-  completed: { label: "Picked up",             color: "#7a8a72", note: "Enjoy! Thanks for your order." },
-  cancelled: { label: "Cancelled",             color: "#b06a6a", note: "This order was cancelled." },
+  received:  { color: "#9B8068" }, making: { color: "#6F8F62" },
+  ready:     { color: "#4c7a3f" }, completed: { color: "#7a8a72" }, cancelled: { color: "#b06a6a" },
 };
 const ACTIVE = ["received", "making", "ready"];
 
 /* ---- review panel (shown when an order is ready) ---- */
 function ReviewPanel({ order, items, existing, onDone }) {
+  const { t } = useLang();
   const [ratings, setRatings] = useState(() =>
     Object.fromEntries(items.map((it) => [it.id, it.item_rating || 0])));
   const [comment, setComment] = useState(existing?.comment || "");
@@ -36,26 +35,26 @@ function ReviewPanel({ order, items, existing, onDone }) {
 
   return (
     <div className="mo-review">
-      <div className="mo-review-head">{existing ? "Your rating" : "Rate your order"}{existing && <span className="mo-reviewed">✓ submitted</span>}</div>
+      <div className="mo-review-head">{existing ? t("mo.yourRating") : t("mo.rate")}{existing && <span className="mo-reviewed">{t("mo.submitted")}</span>}</div>
       {items.map((it) => (
         <div key={it.id} className="mo-rrow">
           <span className="mo-rname">{it.product_name}</span>
           <StarRating value={ratings[it.id]} onChange={(n) => setRatings((r) => ({ ...r, [it.id]: n }))} size={22} />
         </div>
       ))}
-      <textarea className="mo-comment" placeholder="Anything to add? (optional)" value={comment}
+      <textarea className="mo-comment" placeholder={t("mo.addComment")} value={comment}
                 onChange={(e) => setComment(e.target.value)} rows={2} />
       {err && <div className="mo-rerr">{err}</div>}
 
       {!confirm ? (
         <button className="mo-rbtn" disabled={!any || busy} onClick={() => setConfirm(true)}>
-          {existing ? "Update review" : "Submit review"}
+          {existing ? t("mo.update") : t("mo.submit")}
         </button>
       ) : (
         <div className="mo-confirm">
-          <span>Send this review?</span>
-          <button className="mo-rbtn sm" disabled={busy} onClick={submit}>{busy ? "Sending…" : "Confirm"}</button>
-          <button className="mo-rbtn sm ghost" disabled={busy} onClick={() => setConfirm(false)}>Cancel</button>
+          <span>{t("mo.sendReview")}</span>
+          <button className="mo-rbtn sm" disabled={busy} onClick={submit}>{busy ? t("mo.sending") : t("mo.confirm")}</button>
+          <button className="mo-rbtn sm ghost" disabled={busy} onClick={() => setConfirm(false)}>{t("mo.cancelBtn")}</button>
         </div>
       )}
     </div>
@@ -64,6 +63,7 @@ function ReviewPanel({ order, items, existing, onDone }) {
 
 export default function MyOrders({ onClose, onReorder }) {
   const { user } = useAuth();
+  const { t } = useLang();
   const [orders, setOrders] = useState([]);
   const [items, setItems] = useState({});
   const [reviews, setReviews] = useState({});
@@ -102,38 +102,39 @@ export default function MyOrders({ onClose, onReorder }) {
     <div className="mo-overlay" onClick={onClose}>
       <div className="mo-panel" onClick={(e) => e.stopPropagation()}>
         <header className="mo-head">
-          <h2>My Orders</h2>
-          <button className="mo-close" onClick={onClose} aria-label="Close"><X size={20} /></button>
+          <h2>{t("mo.title")}</h2>
+          <button className="mo-close" onClick={onClose} aria-label={t("chat.close")}><X size={20} /></button>
         </header>
 
         <div className="mo-body">
-          {loading && <div className="mo-empty">Loading…</div>}
-          {!loading && orders.length === 0 && <div className="mo-empty">No orders yet. Build your first matcha! 🍵</div>}
+          {loading && <div className="mo-empty">{t("mo.loading")}</div>}
+          {!loading && orders.length === 0 && <div className="mo-empty">{t("mo.emptyAll")}</div>}
 
           {orders.length > 0 && (
             <div className="mo-tabs">
-              <button className={"mo-tab" + (tab === "active" ? " on" : "")} onClick={() => setTab("active")}>Active</button>
-              <button className={"mo-tab" + (tab === "past" ? " on" : "")} onClick={() => setTab("past")}>Past</button>
+              <button className={"mo-tab" + (tab === "active" ? " on" : "")} onClick={() => setTab("active")}>{t("mo.active")}</button>
+              <button className={"mo-tab" + (tab === "past" ? " on" : "")} onClick={() => setTab("past")}>{t("mo.past")}</button>
             </div>
           )}
 
           {!loading && orders.length > 0 && orders.filter((o) => tab === "active" ? ACTIVE.includes(o.status) : !ACTIVE.includes(o.status)).length === 0 && (
-            <div className="mo-empty">{tab === "active" ? "No active orders right now." : "You don't have any past orders yet."}</div>
+            <div className="mo-empty">{tab === "active" ? t("mo.noActive") : t("mo.noPast")}</div>
           )}
           {orders.filter((o) => tab === "active" ? ACTIVE.includes(o.status) : !ACTIVE.includes(o.status)).map((o) => {
             const st = STATUS[o.status] || STATUS.received;
+            const stLabel = t("st." + o.status); const stNote = t("stn." + o.status);
             return (
               <div key={o.id} className={"mo-order" + (o.status === "ready" ? " ready" : "")}>
                 <div className="mo-order-top">
                   <span className="mo-no">{o.order_no || "—"}</span>
-                  <span className="mo-badge" style={{ background: st.color }}>{st.label}</span>
+                  <span className="mo-badge" style={{ background: st.color }}>{stLabel}</span>
                 </div>
-                <div className="mo-note">{st.note}</div>
+                <div className="mo-note">{stNote}</div>
                 {o.status === "cancelled" && o.cancel_reason && (
-                  <div className="mo-cancel-reason">Reason: {o.cancel_reason}</div>
+                  <div className="mo-cancel-reason">{t("mo.reason")} {o.cancel_reason}</div>
                 )}
                 {o.est_ready_at && ACTIVE.includes(o.status) && (
-                  <div className="mo-eta">Ready by ~{timeLabel(o.est_ready_at)}</div>
+                  <div className="mo-eta">{t("mo.readyBy")}{timeLabel(o.est_ready_at)}</div>
                 )}
                 <div className="mo-items">
                   {(items[o.id] || []).map((it) => (
@@ -152,7 +153,7 @@ export default function MyOrders({ onClose, onReorder }) {
                   <span className="mo-total">{vnd(o.subtotal)}</span>
                 </div>
                 {o.status === "received" && (
-                  <button className="mo-cancel" onClick={() => cancelOrder(o.id)}>Cancel order</button>
+                  <button className="mo-cancel" onClick={() => cancelOrder(o.id)}>{t("mo.cancel")}</button>
                 )}
 
                 {o.status === "completed" && (items[o.id] || []).length > 0 && (
@@ -160,7 +161,7 @@ export default function MyOrders({ onClose, onReorder }) {
                 )}
                 {!ACTIVE.includes(o.status) && (items[o.id] || []).length > 0 && onReorder && (
                   <button className="mo-reorder" onClick={() => onReorder((items[o.id] || []).map((it) => ({ config: it.config, qty: it.qty })))}>
-                    Order again
+                    {t("mo.reorder")}
                   </button>
                 )}
               </div>

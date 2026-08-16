@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { supabase } from "../lib/supabase.js";
 import { vnd } from "../data/menu.js";
+import { useLang } from "../lib/i18n.jsx";
 
 const TZ = "Asia/Ho_Chi_Minh";
 const vnDay = (iso) => new Date(iso).toLocaleDateString("en-CA", { timeZone: TZ }); // YYYY-MM-DD
@@ -19,6 +20,7 @@ function Bar({ label, value, max, display }) {
 }
 
 export default function Analytics() {
+  const { t } = useLang();
   const [loading, setLoading] = useState(true);
   const [m, setM] = useState(null);
 
@@ -77,8 +79,8 @@ export default function Analytics() {
     })();
   }, []);
 
-  if (loading) return <div className="an-empty">Crunching numbers…</div>;
-  if (!m) return <div className="an-empty">No data yet.</div>;
+  if (loading) return <div className="an-empty">{t("an.loading")}</div>;
+  if (!m) return <div className="an-empty">{t("an.noData")}</div>;
 
   const maxRev = Math.max(1, ...Object.values(m.revByDay));
   const maxHour = Math.max(1, ...m.byHour);
@@ -89,33 +91,33 @@ export default function Analytics() {
   return (
     <div className="an-wrap">
       <div className="an-kpis">
-        <div className="an-kpi"><div className="an-kpi-v">{vnd(m.revenue)}</div><div className="an-kpi-l">Revenue (non-cancelled)</div></div>
-        <div className="an-kpi"><div className="an-kpi-v">{m.count}</div><div className="an-kpi-l">Orders</div></div>
-        <div className="an-kpi"><div className="an-kpi-v">{m.avgBrew != null ? m.avgBrew.toFixed(1) + "m" : "—"}</div><div className="an-kpi-l">Avg brew time</div></div>
-        <div className="an-kpi"><div className="an-kpi-v">{m.avgRating != null ? m.avgRating.toFixed(2) + "★" : "—"}</div><div className="an-kpi-l">Avg rating</div></div>
-        <div className="an-kpi"><div className="an-kpi-v">{m.cancelRate}%</div><div className="an-kpi-l">Cancel rate</div></div>
+        <div className="an-kpi"><div className="an-kpi-v">{vnd(m.revenue)}</div><div className="an-kpi-l">{t("an.revenue")}</div></div>
+        <div className="an-kpi"><div className="an-kpi-v">{m.count}</div><div className="an-kpi-l">{t("an.orders")}</div></div>
+        <div className="an-kpi"><div className="an-kpi-v">{m.avgBrew != null ? m.avgBrew.toFixed(1) + "m" : "—"}</div><div className="an-kpi-l">{t("an.avgBrew")}</div></div>
+        <div className="an-kpi"><div className="an-kpi-v">{m.avgRating != null ? m.avgRating.toFixed(2) + "★" : "—"}</div><div className="an-kpi-l">{t("an.avgRating")}</div></div>
+        <div className="an-kpi"><div className="an-kpi-v">{m.cancelRate}%</div><div className="an-kpi-l">{t("an.cancelRate")}</div></div>
       </div>
 
       <div className="an-sec">
-        <h3 className="an-h3">Revenue · last 7 days</h3>
+        <h3 className="an-h3">{t("an.revDays")}</h3>
         {m.days.map((d) => <Bar key={d} label={dayShort(d)} value={m.revByDay[d]} max={maxRev} display={vnd(m.revByDay[d])} />)}
       </div>
 
       <div className="an-sec">
-        <h3 className="an-h3">Orders by hour</h3>
-        {activeHours.length === 0 ? <div className="an-hint">No orders yet.</div> :
+        <h3 className="an-h3">{t("an.byHour")}</h3>
+        {activeHours.length === 0 ? <div className="an-hint">{t("an.orders")+": 0"}</div> :
           activeHours.map(([h, v]) => <Bar key={h} label={String(h).padStart(2, "0") + ":00"} value={v} max={maxHour} display={String(v)} />)}
       </div>
 
       <div className="an-sec">
-        <h3 className="an-h3">Top drinks</h3>
-        {m.topDrinks.length === 0 ? <div className="an-hint">No sales yet.</div> :
-          m.topDrinks.map(([name, q]) => <Bar key={name} label={name} value={q} max={maxQty} display={q + " sold"} />)}
+        <h3 className="an-h3">{t("an.topDrinks")}</h3>
+        {m.topDrinks.length === 0 ? <div className="an-hint">{t("an.noSales")}</div> :
+          m.topDrinks.map(([name, q]) => <Bar key={name} label={name} value={q} max={maxQty} display={q + " " + t("an.sold")} />)}
       </div>
 
       <div className="an-sec">
-        <h3 className="an-h3">Rating by product</h3>
-        {m.ratingByProduct.length === 0 ? <div className="an-hint">No ratings yet.</div> :
+        <h3 className="an-h3">{t("an.ratingByProduct")}</h3>
+        {m.ratingByProduct.length === 0 ? <div className="an-hint">{t("an.noRatings")}</div> :
           m.ratingByProduct.map(([name, avg, n]) => (
             <div key={name} className="an-rrow">
               <span className="an-rname">{name}</span>

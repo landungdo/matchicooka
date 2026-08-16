@@ -1,9 +1,11 @@
 import { useState } from "react";
 import { useAuth } from "../lib/AuthContext.jsx";
+import { useLang } from "../lib/i18n.jsx";
 import { BUNNY_SVG } from "../data/assets.js";
 
 export default function AuthModal({ onClose }) {
   const { signIn, signUp } = useAuth();
+  const { t } = useLang();
   const [mode, setMode] = useState("login"); // 'login' | 'signup'
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -14,8 +16,8 @@ export default function AuthModal({ onClose }) {
 
   const submit = async () => {
     setErr(""); setInfo("");
-    if (!email || !pw) { setErr("Please enter your email and password."); return; }
-    if (pw.length < 6) { setErr("Password must be at least 6 characters."); return; }
+    if (!email || !pw) { setErr(t("auth.needCreds")); return; }
+    if (pw.length < 6) { setErr(t("auth.shortPw")); return; }
     setBusy(true);
     try {
       if (mode === "login") {
@@ -26,10 +28,10 @@ export default function AuthModal({ onClose }) {
         const { data, error } = await signUp(email.trim(), pw, name.trim() || null);
         if (error) throw error;
         if (data.session) onClose();
-        else setInfo("Account created! Check your email to confirm, then log in.");
+        else setInfo(t("auth.created"));
       }
     } catch (e) {
-      setErr(e.message || "Something went wrong, please try again.");
+      setErr(e.message || t("auth.generic"));
     } finally {
       setBusy(false);
     }
@@ -41,29 +43,29 @@ export default function AuthModal({ onClose }) {
         <button className="am-close" onClick={onClose} aria-label="Close">✕</button>
 
         <span className="am-bunny" dangerouslySetInnerHTML={{ __html: BUNNY_SVG }} />
-        <h2 className="am-title">{mode === "login" ? "Welcome back!" : "Create account"}</h2>
+        <h2 className="am-title">{mode === "login" ? t("auth.welcome") : t("auth.create")}</h2>
         <p className="am-sub">
-          {mode === "login" ? "Log in to order and message the shop." : "Just a sip away ✿"}
+          {mode === "login" ? t("auth.subLogin") : t("auth.subSignup")}
         </p>
 
         <div className="am-tabs">
-          <button className={"am-tab" + (mode === "login" ? " on" : "")} onClick={() => setMode("login")}>Log in</button>
-          <button className={"am-tab" + (mode === "signup" ? " on" : "")} onClick={() => setMode("signup")}>Sign up</button>
+          <button className={"am-tab" + (mode === "login" ? " on" : "")} onClick={() => setMode("login")}>{t("auth.tabLogin")}</button>
+          <button className={"am-tab" + (mode === "signup" ? " on" : "")} onClick={() => setMode("signup")}>{t("auth.tabSignup")}</button>
         </div>
 
         <div className="am-form">
           {mode === "signup" && (
-            <input className="am-input" placeholder="Display name" value={name} onChange={(e) => setName(e.target.value)} />
+            <input className="am-input" placeholder={t("auth.name")} value={name} onChange={(e) => setName(e.target.value)} />
           )}
-          <input className="am-input" type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} />
-          <input className="am-input" type="password" placeholder="Password (min 6 chars)" value={pw}
+          <input className="am-input" type="email" placeholder={t("auth.email")} value={email} onChange={(e) => setEmail(e.target.value)} />
+          <input className="am-input" type="password" placeholder={t("auth.password")} value={pw}
                  onChange={(e) => setPw(e.target.value)} onKeyDown={(e) => e.key === "Enter" && submit()} />
 
           {err && <div className="am-err">{err}</div>}
           {info && <div className="am-info">{info}</div>}
 
           <button className="am-submit" onClick={submit} disabled={busy}>
-            {busy ? "Please wait…" : mode === "login" ? "Log in" : "Create account"}
+            {busy ? t("auth.wait") : mode === "login" ? t("auth.tabLogin") : t("auth.create")}
           </button>
         </div>
       </div>

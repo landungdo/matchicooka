@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { AuthProvider, useAuth } from "./lib/AuthContext.jsx";
+import { LanguageProvider } from "./lib/i18n.jsx";
 import { supabase } from "./lib/supabase.js";
 import AuthModal from "./components/AuthModal.jsx";
 import Storefront from "./Storefront.jsx";
@@ -162,8 +163,10 @@ function Shell() {
 
 export default function App() {
   return (
-    <AuthProvider>
-      <Shell />
-    </AuthProvider>
+    <LanguageProvider>
+      <AuthProvider>
+        <Shell />
+      </AuthProvider>
+    </LanguageProvider>
   );
 }

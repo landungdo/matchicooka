@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { supabase } from "../lib/supabase.js";
 import { useAuth } from "../lib/AuthContext.jsx";
+import { useLang } from "../lib/i18n.jsx";
 import { BUNNY_SVG } from "../data/assets.js";
 import { vnd, summaryLines } from "../data/menu.js";
 import MessageList from "./MessageList.jsx";
@@ -16,6 +17,7 @@ const timeVN = (iso) =>
 
 /* ---------------- Orders tab ---------------- */
 function OrdersTab() {
+  const { t } = useLang();
   const [orders, setOrders] = useState([]);
   const [itemsByOrder, setItemsByOrder] = useState({});
   const [names, setNames] = useState({});
@@ -64,12 +66,12 @@ function OrdersTab() {
     load(); // reload authoritative state (also arrives via realtime)
   };
   const cancelWithReason = (id) => {
-    const r = window.prompt("Reason for cancelling? (optional, shown to the customer)");
+    const r = window.prompt(t("od.cancelPrompt"));
     if (r === null) return; // user hit cancel on the prompt
     setStatus(id, "cancelled", r.trim() || null);
   };
 
-  if (loading) return <div className="od-empty">Loading orders…</div>;
+  if (loading) return <div className="od-empty">{t("od.loadingOrders")}</div>;
 
   const ql = q.trim().toLowerCase();
   const filtered = orders.filter((o) => {
@@ -82,28 +84,28 @@ function OrdersTab() {
   return (
     <div className="od-orders">
       <div className="od-toolbar">
-        <input className="od-search" placeholder="Search order code, name or phone…" value={q} onChange={(e) => setQ(e.target.value)} />
+        <input className="od-search" placeholder={t("od.search")} value={q} onChange={(e) => setQ(e.target.value)} />
         <div className="od-chips">
-          {[["all", "All"], ["received", "New"], ["making", "Making"], ["ready", "Ready"], ["completed", "Picked up"], ["cancelled", "Cancelled"]].map(([v, l]) => (
-            <button key={v} className={"od-chip" + (statusF === v ? " on" : "")} onClick={() => setStatusF(v)}>{l}</button>
+          {[["all", "od.all"], ["received", "od.st.received"], ["making", "od.st.making"], ["ready", "od.st.ready"], ["completed", "od.st.completed"], ["cancelled", "od.st.cancelled"]].map(([v, l]) => (
+            <button key={v} className={"od-chip" + (statusF === v ? " on" : "")} onClick={() => setStatusF(v)}>{t(l)}</button>
           ))}
         </div>
       </div>
-      {orders.length === 0 && <div className="od-empty">No orders yet. New orders appear here in real time.</div>}
-      {orders.length > 0 && filtered.length === 0 && <div className="od-empty">No matching orders.</div>}
+      {orders.length === 0 && <div className="od-empty">{t("od.noOrders")}</div>}
+      {orders.length > 0 && filtered.length === 0 && <div className="od-empty">{t("od.noMatch")}</div>}
       {filtered.map((o) => (
         <div key={o.id} className="od-order">
           <div className="od-order-top">
             <div>
               <span className="od-no">{o.order_no || "—"}</span>
-              <span className="od-cust">{names[o.user_id] || "Guest"}</span>
+              <span className="od-cust">{names[o.user_id] || t("od.guest")}</span>
               <span className="od-time">{timeVN(o.created_at)}</span>
             </div>
             <div className="od-badges">
               {reviews[o.id] && (
                 <span className="od-review-badge"><StarRating value={reviews[o.id].rating} size={13} readOnly /> {reviews[o.id].rating}.0</span>
               )}
-              <span className="od-badge" style={{ background: STATUS_COLOR[o.status] }}>{STATUS_LABEL[o.status]}</span>
+              <span className="od-badge" style={{ background: STATUS_COLOR[o.status] }}>{t("od.st." + o.status)}</span>
             </div>
           </div>
           {(o.phone || o.note) && (
@@ -126,17 +128,17 @@ function OrdersTab() {
             ))}
           </div>
 
-          {o.status === "cancelled" && o.cancel_reason && <div className="od-cancel-reason">Cancelled: {o.cancel_reason}</div>}
+          {o.status === "cancelled" && o.cancel_reason && <div className="od-cancel-reason">{t("od.cancelled")} {o.cancel_reason}</div>}
           {reviews[o.id]?.comment && <div className="od-review-comment">“{reviews[o.id].comment}”</div>}
 
           <div className="od-order-foot">
             <span className="od-total">{vnd(o.subtotal)}</span>
             <div className="od-actions">
-              {o.status === "received" && <button className="od-btn go" disabled={busyId===o.id} onClick={() => setStatus(o.id, "making")}>Start making</button>}
-              {o.status === "making" && <button className="od-btn go" disabled={busyId===o.id} onClick={() => setStatus(o.id, "ready")}>Mark ready</button>}
-              {o.status === "ready" && <button className="od-btn go" disabled={busyId===o.id} onClick={() => setStatus(o.id, "completed")}>Picked up</button>}
+              {o.status === "received" && <button className="od-btn go" disabled={busyId===o.id} onClick={() => setStatus(o.id, "making")}>{t("od.startMaking")}</button>}
+              {o.status === "making" && <button className="od-btn go" disabled={busyId===o.id} onClick={() => setStatus(o.id, "ready")}>{t("od.markReady")}</button>}
+              {o.status === "ready" && <button className="od-btn go" disabled={busyId===o.id} onClick={() => setStatus(o.id, "completed")}>{t("od.pickedUp")}</button>}
               {(o.status === "received" || o.status === "making" || o.status === "ready") && (
-                <button className="od-btn cancel" disabled={busyId===o.id} onClick={() => cancelWithReason(o.id)}>Cancel</button>
+                <button className="od-btn cancel" disabled={busyId===o.id} onClick={() => cancelWithReason(o.id)}>{t("od.cancel")}</button>
               )}
             </div>
           </div>
@@ -148,6 +150,7 @@ function OrdersTab() {
 
 /* ---------------- Messages tab ---------------- */
 function MessagesTab({ ownerId }) {
+  const { t } = useLang();
   const [rooms, setRooms] = useState([]);
   const [names, setNames] = useState({});
   const [sel, setSel] = useState(null);
@@ -202,17 +205,17 @@ function MessagesTab({ ownerId }) {
   return (
     <div className="od-chat">
       <div className="od-rooms">
-        {rooms.length === 0 && <div className="od-empty sm">No messages yet.</div>}
+        {rooms.length === 0 && <div className="od-empty sm">{t("od.noMsg")}</div>}
         {rooms.map((r) => (
           <button key={r} className={"od-room" + (sel === r ? " on" : "")} onClick={() => setSel(r)}>
             <span className="od-room-ava" dangerouslySetInnerHTML={{ __html: BUNNY_SVG }} />
-            {names[r] || "Guest"}
+            {names[r] || t("od.guest")}
           </button>
         ))}
       </div>
 
       <div className="od-thread">
-        {!sel && <div className="od-empty">Select a customer to reply.</div>}
+        {!sel && <div className="od-empty">{t("od.selectCust")}</div>}
         {sel && (
           <>
             <div className="od-thread-body">
@@ -220,7 +223,7 @@ function MessagesTab({ ownerId }) {
               <div ref={endRef} />
             </div>
             <div className="od-thread-foot">
-              <input className="cd-input" placeholder="Reply to customer…" value={text}
+              <input className="cd-input" placeholder={t("od.reply")} value={text}
                      onChange={(e) => setText(e.target.value)} onKeyDown={(e) => e.key === "Enter" && send()} />
               <button className="cd-send" onClick={send} aria-label="Send"><Send size={17} /></button>
             </div>
@@ -234,6 +237,7 @@ function MessagesTab({ ownerId }) {
 /* ---------------- Shell ---------------- */
 export default function OwnerDashboard({ onClose }) {
   const { user, name } = useAuth();
+  const { t } = useLang();
   const [tab, setTab] = useState("orders");
 
   return (
@@ -242,24 +246,24 @@ export default function OwnerDashboard({ onClose }) {
         <header className="od-head">
           <span className="od-bunny" dangerouslySetInnerHTML={{ __html: BUNNY_SVG }} />
           <div className="od-hi">
-            <div className="od-shop">matchicooka · manager</div>
-            <div className="od-owner">Hi {name}</div>
+            <div className="od-shop">matchicooka · {t("od.manager")}</div>
+            <div className="od-owner">{t("od.hi", { name })}</div>
           </div>
           <div className="od-tabs">
             <button className={"od-tab" + (tab === "orders" ? " on" : "")} onClick={() => setTab("orders")}>
-              <ShoppingBag size={15} /> Orders
+              <ShoppingBag size={15} /> {t("od.orders")}
             </button>
             <button className={"od-tab" + (tab === "chat" ? " on" : "")} onClick={() => setTab("chat")}>
-              <MessageSquare size={15} /> Messages
+              <MessageSquare size={15} /> {t("od.messages")}
             </button>
             <button className={"od-tab" + (tab === "shop" ? " on" : "")} onClick={() => setTab("shop")}>
-              <Store size={15} /> Shop
+              <Store size={15} /> {t("od.shop")}
             </button>
             <button className={"od-tab" + (tab === "insights" ? " on" : "")} onClick={() => setTab("insights")}>
-              <BarChart3 size={15} /> Insights
+              <BarChart3 size={15} /> {t("od.insights")}
             </button>
           </div>
-          <button className="od-close" onClick={onClose} aria-label="Close"><X size={20} /></button>
+          <button className="od-close" onClick={onClose} aria-label={t("od.close")}><X size={20} /></button>
         </header>
 
         <div className="od-content">

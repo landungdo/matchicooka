@@ -1,15 +1,17 @@
 import { useState, useEffect } from "react";
 import { supabase } from "../lib/supabase.js";
+import { useLang } from "../lib/i18n.jsx";
 
 const MAP = {
-  normal:    { label: "Open",      color: "#4c7a3f", dot: "#7ed07e" },
-  busy:      { label: "Busy",      color: "#9B8068", dot: "#e0b44b" },
-  very_busy: { label: "Very busy", color: "#b0763f", dot: "#e08a3f" },
-  paused:    { label: "Paused",    color: "#8a8a8a", dot: "#bbb" },
-  closed:    { label: "Closed",    color: "#5b6b5f", dot: "#888" },
+  normal:    { key: "ss.open",      color: "#4c7a3f", dot: "#7ed07e" },
+  busy:      { key: "ss.busy",      color: "#9B8068", dot: "#e0b44b" },
+  very_busy: { key: "ss.very_busy", color: "#b0763f", dot: "#e08a3f" },
+  paused:    { key: "ss.paused",    color: "#8a8a8a", dot: "#bbb" },
+  closed:    { key: "ss.closed",    color: "#5b6b5f", dot: "#888" },
 };
 
 export default function ShopStatusBadge() {
+  const { t } = useLang();
   const [s, setS] = useState(null);
 
   useEffect(() => {
@@ -28,12 +30,12 @@ export default function ShopStatusBadge() {
   if (!s) return null;
   const m = MAP[s.status] || MAP.normal;
   const eta = s.accepting_orders && s.status !== "closed"
-    ? ` · ~${s.min_prep_minutes}–${s.max_prep_minutes} min` : "";
+    ? ` · ~${s.min_prep_minutes}–${s.max_prep_minutes} ${t("min")}` : "";
 
   return (
     <div className="ssb" style={{ color: m.color }} title={s.message || ""}>
       <span className="ssb-dot" style={{ background: m.dot }} />
-      {m.label}{eta}
+      {t(m.key)}{eta}
       {s.message ? <span className="ssb-msg">· {s.message}</span> : null}
       <style>{`
         .ssb{position:fixed;top:12px;left:50%;transform:translateX(-50%);z-index:60;

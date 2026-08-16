@@ -3,10 +3,12 @@ import { supabase } from "../lib/supabase.js";
 import { useAuth } from "../lib/AuthContext.jsx";
 import { BUNNY_SVG } from "../data/assets.js";
 import MessageList from "./MessageList.jsx";
+import { useLang } from "../lib/i18n.jsx";
 import { MessageCircle, X, Send } from "lucide-react";
 
 export default function ChatDock() {
   const { user } = useAuth();
+  const { t } = useLang();
   const [open, setOpen] = useState(false);
   const [msgs, setMsgs] = useState([]);
   const [text, setText] = useState("");
@@ -57,7 +59,7 @@ export default function ChatDock() {
   return (
     <>
       {!open && (
-        <button className="cd-fab" onClick={() => setOpen(true)} aria-label="Chat with the shop">
+        <button className="cd-fab" onClick={() => setOpen(true)} aria-label={t("chat.open")}>
           <MessageCircle size={24} />
         </button>
       )}
@@ -68,17 +70,17 @@ export default function ChatDock() {
             <span className="cd-bunny" dangerouslySetInnerHTML={{ __html: BUNNY_SVG }} />
             <div>
               <div className="cd-title">matchicooka</div>
-              <div className="cd-sub">Message the shop ✿</div>
+              <div className="cd-sub">{t("chat.sub")}</div>
             </div>
-            <button className="cd-x" onClick={() => setOpen(false)} aria-label="Close"><X size={18} /></button>
+            <button className="cd-x" onClick={() => setOpen(false)} aria-label={t("chat.close")}><X size={18} /></button>
           </header>
 
           <div className="cd-body">
-            {loading && <div className="cd-empty">Loading…</div>}
+            {loading && <div className="cd-empty">{t("chat.loading")}</div>}
             {!loading && msgs.length === 0 && (
               <div className="cd-empty">
                 <span className="cd-bunny lg" dangerouslySetInnerHTML={{ __html: BUNNY_SVG }} />
-                <p>Hi! Message us anything — less ice, extra foam, order status…</p>
+                <p>{t("chat.empty")}</p>
               </div>
             )}
             <MessageList msgs={msgs} mineRole="customer" />
@@ -88,12 +90,12 @@ export default function ChatDock() {
           <div className="cd-foot">
             <input
               className="cd-input"
-              placeholder="Type a message…"
+              placeholder={t("chat.type")}
               value={text}
               onChange={(e) => setText(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && send()}
             />
-            <button className="cd-send" onClick={send} aria-label="Send"><Send size={17} /></button>
+            <button className="cd-send" onClick={send} aria-label={t("chat.send")}><Send size={17} /></button>
           </div>
         </div>
       )}

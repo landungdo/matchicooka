@@ -1,27 +1,29 @@
 import { BUNNY_SVG } from "../data/assets.js";
 import { vnd } from "../data/menu.js";
 import { timeLabel } from "../lib/time.js";
+import { useLang } from "../lib/i18n.jsx";
 import { Check } from "lucide-react";
 
 export default function OrderConfirm({ order, onTrack, onClose }) {
+  const { t } = useLang();
   return (
     <div className="oc-overlay" onClick={onClose}>
-      <div className="oc-card" role="dialog" aria-modal="true" aria-label="Order received" onClick={(e) => e.stopPropagation()}>
+      <div className="oc-card" role="dialog" aria-modal="true" aria-label={t("oc.received")} onClick={(e) => e.stopPropagation()}>
         <div className="oc-check"><Check size={30} strokeWidth={3} /></div>
         <span className="oc-bunny" dangerouslySetInnerHTML={{ __html: BUNNY_SVG }} />
-        <h2 className="oc-title">Order received!</h2>
+        <h2 className="oc-title">{t("oc.received")}</h2>
         <div className="oc-no">{order.order_no || "—"}</div>
-        <p className="oc-sub">Show this order number at the counter.</p>
+        <p className="oc-sub">{t("oc.showNo")}</p>
 
-        <div className="oc-row"><span>Items</span><span>{order.count}</span></div>
-        <div className="oc-row"><span>Total</span><span className="oc-total">{vnd(order.subtotal)}</span></div>
+        <div className="oc-row"><span>{t("oc.items")}</span><span>{order.count}</span></div>
+        <div className="oc-row"><span>{t("oc.total")}</span><span className="oc-total">{vnd(order.subtotal)}</span></div>
         {order.est_ready_at && (
-          <div className="oc-row"><span>Ready by</span><span>~{timeLabel(order.est_ready_at)}{order.est_min ? ` (${order.est_min}–${order.est_max} min)` : ""}</span></div>
+          <div className="oc-row"><span>{t("oc.readyBy")}</span><span>~{timeLabel(order.est_ready_at)}{order.est_min ? ` (${order.est_min}–${order.est_max} ${t("min")})` : ""}</span></div>
         )}
-        <div className="oc-row"><span>Payment</span><span>Pay at counter</span></div>
+        <div className="oc-row"><span>{t("oc.payment")}</span><span>{t("oc.payCounter")}</span></div>
 
-        <button className="oc-btn primary" onClick={onTrack}>Track my order</button>
-        <button className="oc-btn ghost" onClick={onClose}>Continue shopping</button>
+        <button className="oc-btn primary" onClick={onTrack}>{t("oc.track")}</button>
+        <button className="oc-btn ghost" onClick={onClose}>{t("oc.continue")}</button>
       </div>
 
       <style>{`

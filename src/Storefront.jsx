@@ -15,6 +15,7 @@ import {
 /* ---------- Brand assets (compressed WebP data URIs) ---------- */
 import { ASSETS, BUNNY_SVG } from "./data/assets.js";
 import { supabase } from "./lib/supabase.js";
+import { useLang } from "./lib/i18n.jsx";
 
 /* ---------- Design tokens ---------- */
 const C = {
@@ -218,15 +219,16 @@ function ExtrasSelector({ value, onToggle }) {
 
 /* ---------- Order summary ---------- */
 function OrderSummary({ cfg, onAdd, onSave }) {
+  const { t } = useLang();
   const [name, setName] = useState("");
   return (
     <div className="mx-summary">
       <div className="mx-sum-name">{findP(cfg.productId).name}</div>
       <div className="mx-chips">{summaryLines(cfg).map((l, i) => <span key={i} className="mx-chip">{l}</span>)}</div>
-      <button className="mx-btn mx-btn-primary mx-addbtn" onClick={onAdd}><ShoppingBag size={17} /> Add to Cart — {vnd(priceOf(cfg))}</button>
+      <button className="mx-btn mx-btn-primary mx-addbtn" onClick={onAdd}><ShoppingBag size={17} /> {t("build.add")} — {vnd(priceOf(cfg))}</button>
       <div className="mx-saverow">
-        <input className="mx-input" placeholder="Name this matcha…" value={name} onChange={(e) => setName(e.target.value)} />
-        <button className="mx-btn mx-btn-ghost" onClick={() => { onSave(name.trim() || "My Matcha"); setName(""); }}><Heart size={15} /> Save</button>
+        <input className="mx-input" placeholder={t("build.nameph")} value={name} onChange={(e) => setName(e.target.value)} />
+        <button className="mx-btn mx-btn-ghost" onClick={() => { onSave(name.trim() || "My Matcha"); setName(""); }}><Heart size={15} /> {t("build.save")}</button>
       </div>
     </div>
   );
@@ -244,6 +246,7 @@ function Step({ id, n, title, children }) {
   );
 }
 function BuildPage({ cfg, setCfg, onAdd, onSave }) {
+  const { t } = useLang();
   const set = (k, v) => setCfg((c) => ({ ...c, [k]: v }));
   const toggle = (id) => setCfg((c) => ({ ...c, extras: c.extras.includes(id) ? c.extras.filter((x) => x !== id) : [...c.extras, id] }));
   const scrollTo = (id) => document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -261,16 +264,16 @@ function BuildPage({ cfg, setCfg, onAdd, onSave }) {
           <div className="mx-hide-mobile"><OrderSummary cfg={cfg} onAdd={onAdd} onSave={onSave} /></div>
         </div>
         <div className="mx-right">
-          <Step id="s-strength" n="1" title="How matcha are you feeling?"><StrengthSelector value={cfg.strength} onChange={(v) => set("strength", v)} /></Step>
-          <Step id="s-sweet" n="2" title="How sweet?"><SweetnessSelector value={cfg.sweetness} onChange={(v) => set("sweetness", v)} /></Step>
-          <Step id="s-milk" n="3" title="Choose your milk"><MilkSelector value={cfg.milk} onChange={(v) => set("milk", v)} /></Step>
-          <Step id="s-ice" n="4" title="Ice level"><IceSelector value={cfg.ice} onChange={(v) => set("ice", v)} /></Step>
-          <Step id="s-extras" n="5" title="Add some extras"><ExtrasSelector value={cfg.extras} onToggle={toggle} /></Step>
+          <Step id="s-strength" n="1" title={t("build.s1")}><StrengthSelector value={cfg.strength} onChange={(v) => set("strength", v)} /></Step>
+          <Step id="s-sweet" n="2" title={t("build.s2")}><SweetnessSelector value={cfg.sweetness} onChange={(v) => set("sweetness", v)} /></Step>
+          <Step id="s-milk" n="3" title={t("build.s3")}><MilkSelector value={cfg.milk} onChange={(v) => set("milk", v)} /></Step>
+          <Step id="s-ice" n="4" title={t("build.s4")}><IceSelector value={cfg.ice} onChange={(v) => set("ice", v)} /></Step>
+          <Step id="s-extras" n="5" title={t("build.s5")}><ExtrasSelector value={cfg.extras} onToggle={toggle} /></Step>
         </div>
       </div>
       <div className="mx-mobilebar">
         <div><div className="mx-mb-name">{findP(cfg.productId).name}</div><div className="mx-mb-price">{vnd(priceOf(cfg))}</div></div>
-        <button className="mx-btn mx-btn-primary" onClick={onAdd}><ShoppingBag size={16} /> Add to Cart</button>
+        <button className="mx-btn mx-btn-primary" onClick={onAdd}><ShoppingBag size={16} /> {t("build.add")}</button>
       </div>
     </div>
   );
@@ -280,16 +283,17 @@ function BuildPage({ cfg, setCfg, onAdd, onSave }) {
    Home
    ============================================================ */
 function Home({ go, onPreset, onCloud }) {
+  const { t } = useLang();
   return (
     <div className="mx-home">
       <section className="mx-hero">
         <div className="mx-hero-copy">
-          <div className="mx-eyebrow"><Sparkles size={14} /> Whisked fresh, made to order</div>
-          <h1 className="mx-h1">Matcha,<br />made your way.</h1>
-          <p className="mx-lead">Pick your strength, sweetness, milk and more. We'll whisk your perfect cup — cute little bear on top optional.</p>
+          <div className="mx-eyebrow"><Sparkles size={14} /> {t("hero.eyebrow")}</div>
+          <h1 className="mx-h1">{t("hero.title1")}<br />{t("hero.title2")}</h1>
+          <p className="mx-lead">{t("hero.lead")}</p>
           <div className="mx-herobtns">
-            <button className="mx-btn mx-btn-primary" onClick={() => go("build")}>Build My Matcha <ArrowRight size={17} /></button>
-            <button className="mx-btn mx-btn-ghost" onClick={() => go("menu")}>Explore Menu</button>
+            <button className="mx-btn mx-btn-primary" onClick={() => go("build")}>{t("hero.build")} <ArrowRight size={17} /></button>
+            <button className="mx-btn mx-btn-ghost" onClick={() => go("menu")}>{t("hero.explore")}</button>
           </div>
         </div>
         <div className="mx-hero-art">
@@ -343,20 +347,21 @@ function Home({ go, onPreset, onCloud }) {
    Menu / Saved
    ============================================================ */
 function Menu({ onCustomize, soldOut }) {
+  const { t } = useLang();
   return (
     <div className="mx-menu">
-      <div className="mx-sec-head"><h2 className="mx-h2">Our Matcha</h2><p className="mx-sub">Seven house drinks. Every one fully customisable.</p></div>
+      <div className="mx-sec-head"><h2 className="mx-h2">{t("menu.title")}</h2><p className="mx-sub">{t("menu.sub")}</p></div>
       <div className="mx-menugrid">
         {PRODUCTS.map((p) => {
           const out = soldOut && soldOut.has(p.id);
           return (
           <div key={p.id} className={"mx-card mx-menucard" + (out ? " mx-out" : "")}>
-            <div className="mx-menuart"><DrinkPreview cfg={{ ...DEFAULT_CONFIG, productId: p.id }} size={150} />{out && <span className="mx-out-tag">Sold out</span>}</div>
+            <div className="mx-menuart"><DrinkPreview cfg={{ ...DEFAULT_CONFIG, productId: p.id }} size={150} />{out && <span className="mx-out-tag">{t("menu.soldout")}</span>}</div>
             <div className="mx-menu-name">{p.name}</div><p className="mx-menu-desc">{p.desc}</p>
-            <div className="mx-menu-foot"><span className="mx-from">From {vnd(p.base)}</span>
+            <div className="mx-menu-foot"><span className="mx-from">{t("menu.from")} {vnd(p.base)}</span>
               {out
-                ? <button className="mx-btn mx-btn-soft" disabled>Sold out</button>
-                : <button className="mx-btn mx-btn-soft" onClick={() => onCustomize(p.id)}>Customize</button>}
+                ? <button className="mx-btn mx-btn-soft" disabled>{t("menu.soldout")}</button>
+                : <button className="mx-btn mx-btn-soft" onClick={() => onCustomize(p.id)}>{t("menu.customize")}</button>}
             </div>
           </div>
           );
@@ -366,17 +371,18 @@ function Menu({ onCustomize, soldOut }) {
   );
 }
 function Saved({ items, onOrder, onRemove }) {
+  const { t } = useLang();
   if (!items.length)
     return (
       <div className="mx-empty">
         <Sticker src={ASSETS.stickerCat} alt="" className="mx-empty-sticker" />
-        <h2 className="mx-h2">No saved matcha yet</h2>
+        <h2 className="mx-h2">{t("saved.empty")}</h2>
         <p className="mx-sub">Build a drink you love and hit Save to keep the recipe here.</p>
       </div>
     );
   return (
     <div className="mx-menu">
-      <div className="mx-sec-head"><h2 className="mx-h2">My Matcha</h2><p className="mx-sub">Your saved recipes.</p></div>
+      <div className="mx-sec-head"><h2 className="mx-h2">{t("saved.title")}</h2><p className="mx-sub">{t("saved.sub")}</p></div>
       <div className="mx-menugrid">
         {items.map((it) => (
           <div key={it.id} className="mx-card mx-menucard">
@@ -400,6 +406,7 @@ function Saved({ items, onOrder, onRemove }) {
    Cart drawer
    ============================================================ */
 function CartDrawer({ open, onClose, items, setItems, onCheckout, phone, setPhone, note, setNote }) {
+  const { t } = useLang();
   const subtotal = items.reduce((s, it) => s + it.price * it.qty, 0);
   const setQty = (id, d) => setItems((arr) => arr.map((it) => it.id === id ? { ...it, qty: Math.max(1, it.qty + d) } : it));
   const remove = (id) => setItems((arr) => arr.filter((it) => it.id !== id));
@@ -407,10 +414,10 @@ function CartDrawer({ open, onClose, items, setItems, onCheckout, phone, setPhon
     <>
       <div className={"mx-overlay" + (open ? " show" : "")} onClick={onClose} />
       <aside className={"mx-cart" + (open ? " open" : "")} aria-hidden={!open}>
-        <div className="mx-cart-head"><h3>Your Cart</h3><button className="mx-iconbtn" onClick={onClose} aria-label="Close cart"><X size={20} /></button></div>
+        <div className="mx-cart-head"><h3>{t("cart.title")}</h3><button className="mx-iconbtn" onClick={onClose} aria-label="Close cart"><X size={20} /></button></div>
         <div className="mx-cart-body">
           {items.length === 0 && (
-            <div className="mx-cart-empty"><Sticker src={ASSETS.stickerHamster} alt="" className="mx-cart-emptysticker" /><p>Your cart is empty.<br />Go build something good.</p></div>
+            <div className="mx-cart-empty"><Sticker src={ASSETS.stickerHamster} alt="" className="mx-cart-emptysticker" /><p>{t("cart.empty1")}<br />{t("cart.empty2")}</p></div>
           )}
           {items.map((it) => (
             <div key={it.id} className="mx-cartitem">
@@ -430,13 +437,13 @@ function CartDrawer({ open, onClose, items, setItems, onCheckout, phone, setPhon
         <div className="mx-cart-footer">
           {items.length > 0 && (
             <>
-              <input className="mx-cart-field" placeholder="Phone number (for pickup)" value={phone} onChange={(e) => setPhone(e.target.value)} />
-              <input className="mx-cart-field" placeholder="Note for the shop (optional)" value={note} onChange={(e) => setNote(e.target.value)} />
+              <input className="mx-cart-field" placeholder={t("cart.phone")} value={phone} onChange={(e) => setPhone(e.target.value)} />
+              <input className="mx-cart-field" placeholder={t("cart.note")} value={note} onChange={(e) => setNote(e.target.value)} />
             </>
           )}
-          <div className="mx-subtotal"><span>Subtotal</span><span>{vnd(subtotal)}</span></div>
-          <button className="mx-btn mx-btn-ghost" onClick={onClose}>Continue Shopping</button>
-          <button className="mx-btn mx-btn-primary" disabled={!items.length || !phone.trim()} onClick={onCheckout}>Checkout</button>
+          <div className="mx-subtotal"><span>{t("cart.subtotal")}</span><span>{vnd(subtotal)}</span></div>
+          <button className="mx-btn mx-btn-ghost" onClick={onClose}>{t("cart.continue")}</button>
+          <button className="mx-btn mx-btn-primary" disabled={!items.length || !phone.trim()} onClick={onCheckout}>{t("cart.checkout")}</button>
         </div>
       </aside>
     </>
@@ -447,6 +454,7 @@ function CartDrawer({ open, onClose, items, setItems, onCheckout, phone, setPhon
    App shell
    ============================================================ */
 export default function Storefront({ user, name, defaultPhone = "", reorderItems, onReordered, onLogin, onLogout, onPlaceOrder, onRequireLogin }) {
+  const { t, lang, setLang } = useLang();
   const [view, setView] = useState("home");
   const [cfg, setCfg] = useState(DEFAULT_CONFIG);
   const [cart, setCart] = useState(() => loadLS("mx_cart", []));
@@ -498,17 +506,17 @@ export default function Storefront({ user, name, defaultPhone = "", reorderItems
   const usePreset = (p) => startBuild({ ...DEFAULT_CONFIG, ...p.config });
   const buildCloud = () => startBuild({ ...DEFAULT_CONFIG, productId: "cloud", extras: ["creamCheeseFoam"] });
   const addToCart = () => { setCart((a) => [...a, { id: Date.now() + "-" + Math.random().toString(36).slice(2), config: { ...cfg }, qty: 1, price: priceOf(cfg) }]); setCartOpen(true); };
-  const saveMatcha = (name) => { setSaved((a) => [...a, { id: Date.now() + "", name, config: { ...cfg } }]); ping("Saved to My Matcha ✿"); };
+  const saveMatcha = (name) => { setSaved((a) => [...a, { id: Date.now() + "", name, config: { ...cfg } }]); ping(t("toast.saved")); };
   const checkout = async () => {
     if (onPlaceOrder) {
       if (!user) { onRequireLogin && onRequireLogin(); return; }
       const ok = await onPlaceOrder(cart, { phone: phone.trim(), note: note.trim() });
       if (ok) { setCart([]); setCartOpen(false); setPhone(""); setNote(""); }   // App shows the confirmation screen
-      else { ping("Couldn't place order. Try again."); }
-    } else { setCart([]); setCartOpen(false); ping("Order placed — see you at the counter!"); }
+      else { ping(t("toast.failed")); }
+    } else { setCart([]); setCartOpen(false); ping(t("toast.placed")); }
   };
 
-  const nav = [["home", "Home"], ["menu", "Menu"], ["build", "Build Your Matcha"], ["saved", "My Matcha"]];
+  const nav = [["home", "nav.home"], ["menu", "nav.menu"], ["build", "nav.build"], ["saved", "nav.saved"]];
 
   return (
     <div className="mx-root">
@@ -518,11 +526,12 @@ export default function Storefront({ user, name, defaultPhone = "", reorderItems
           <Bunny size={38} /><span className="mx-word">matchi<em>cooka</em></span><span className="mx-bar">bar</span>
         </button>
         <nav className="mx-navlinks">
-          {nav.map(([v, label]) => <button key={v} className={"mx-navlink" + (view === v ? " active" : "")} onClick={() => go(v)}>{label}</button>)}
+          {nav.map(([v, label]) => <button key={v} className={"mx-navlink" + (view === v ? " active" : "")} onClick={() => go(v)}>{t(label)}</button>)}
         </nav>
+        <button className="mx-langtoggle" onClick={() => setLang(lang === "en" ? "vi" : "en")} aria-label="Switch language">{lang === "en" ? "VI" : "EN"}</button>
         {user
-          ? <button className="mx-authchip" onClick={onLogout}>{name} · Đăng xuất</button>
-          : <button className="mx-authchip" onClick={onLogin}>Đăng nhập</button>}
+          ? <button className="mx-authchip" onClick={onLogout}>{name} · {t("auth.logout")}</button>
+          : <button className="mx-authchip" onClick={onLogin}>{t("auth.login")}</button>}
         <button className="mx-cartbtn" onClick={() => setCartOpen(true)} aria-label="Open cart">
           <ShoppingBag size={20} />{cartCount > 0 && <span className="mx-cartcount">{cartCount}</span>}
         </button>
@@ -574,6 +583,8 @@ h1,h2,h3{font-family:'Fraunces','Georgia',serif;font-weight:600;margin:0;letter-
 .mx-navlink{padding:.5rem .85rem;border-radius:999px;font-size:.92rem;font-weight:500;color:rgba(48,66,54,.65);transition:all .2s;}
 .mx-navlink:hover{color:var(--dark);background:var(--cream);}
 .mx-navlink.active{color:var(--matcha);background:var(--lightM);}
+.mx-langtoggle{padding:.4rem .7rem;border-radius:999px;border:1.5px solid rgba(48,66,54,.14);background:var(--cream);font-size:.8rem;font-weight:700;color:var(--dark);cursor:pointer;margin-right:.2rem;}
+.mx-langtoggle:hover{border-color:var(--matcha);color:var(--matcha);}
 .mx-cartbtn{position:relative;width:42px;height:42px;border-radius:50%;background:var(--cream);display:grid;place-items:center;transition:all .2s;}
 .mx-cartbtn:hover{background:var(--lightM);transform:translateY(-1px);}
 .mx-cartcount{position:absolute;top:-3px;right:-3px;min-width:19px;height:19px;padding:0 5px;border-radius:999px;background:var(--matcha);color:#fff;font-size:.68rem;font-weight:600;display:grid;place-items:center;}
