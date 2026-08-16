@@ -16,9 +16,12 @@ const timeVN = (iso) =>
   new Date(iso).toLocaleString("en-GB", { timeZone: "Asia/Ho_Chi_Minh", hour: "2-digit", minute: "2-digit", day: "2-digit", month: "2-digit" });
 
 /* ---------------- Orders tab ---------------- */
+const maskPhone = (p) => (p && p.length > 3 ? "•".repeat(Math.max(0, p.length - 3)) + p.slice(-3) : p);
+
 function OrdersTab() {
   const { t } = useLang();
   const [orders, setOrders] = useState([]);
+  const [revealed, setRevealed] = useState(() => new Set());
   const [itemsByOrder, setItemsByOrder] = useState({});
   const [names, setNames] = useState({});
   const [reviews, setReviews] = useState({});
@@ -110,7 +113,7 @@ function OrdersTab() {
           </div>
           {(o.phone || o.note) && (
             <div className="od-contact">
-              {o.phone && <span className="od-phone">☎ {o.phone}</span>}
+              {o.phone && <span className="od-phone" style={{ cursor: "pointer" }} onClick={() => setRevealed((r) => { const n = new Set(r); n.has(o.id) ? n.delete(o.id) : n.add(o.id); return n; })} title="Tap to reveal">☎ {revealed.has(o.id) ? o.phone : maskPhone(o.phone)}</span>}
               {o.note && <span className="od-ordernote">“{o.note}”</span>}
             </div>
           )}

@@ -34,8 +34,11 @@ export default function Analytics() {
 
       const cancelled = new Set(os.filter((o) => o.status === "cancelled").map((o) => o.id));
       const live = os.filter((o) => o.status !== "cancelled");
+      const completed = os.filter((o) => o.status === "completed");
+      const openOrders = os.filter((o) => ["received","making","ready"].includes(o.status));
 
-      const revenue = live.reduce((s, o) => s + (o.subtotal || 0), 0);
+      const revenue = completed.reduce((s, o) => s + (o.subtotal || 0), 0);
+      const openValue = openOrders.reduce((s, o) => s + (o.subtotal || 0), 0);
       const count = live.length;
       const cancelRate = os.length ? Math.round((cancelled.size / os.length) * 100) : 0;
 
@@ -56,7 +59,7 @@ export default function Analytics() {
         days.push(d.toLocaleDateString("en-CA", { timeZone: TZ }));
       }
       const revByDay = Object.fromEntries(days.map((d) => [d, 0]));
-      live.forEach((o) => { const d = vnDay(o.created_at); if (d in revByDay) revByDay[d] += o.subtotal || 0; });
+      completed.forEach((o) => { const d = vnDay(o.created_at); if (d in revByDay) revByDay[d] += o.subtotal || 0; });
 
       // orders by hour
       const byHour = Array.from({ length: 24 }, () => 0);
@@ -74,7 +77,7 @@ export default function Analytics() {
         .map(([name, arr]) => [name, arr.reduce((a, b) => a + b, 0) / arr.length, arr.length])
         .sort((a, b) => b[1] - a[1]);
 
-      setM({ revenue, count, cancelRate, avgBrew, avgRating, revByDay, days, byHour, topDrinks, ratingByProduct });
+      setM({ revenue, openValue, count, cancelRate, avgBrew, avgRating, revByDay, days, byHour, topDrinks, ratingByProduct });
       setLoading(false);
     })();
   }, []);
@@ -91,7 +94,8 @@ export default function Analytics() {
   return (
     <div className="an-wrap">
       <div className="an-kpis">
-        <div className="an-kpi"><div className="an-kpi-v">{vnd(m.revenue)}</div><div className="an-kpi-l">{t("an.revenue")}</div></div>
+        <div className="an-kpi"><div className="an-kpi-v">{vnd(m.revenue)}</div><div className="an-kpi-l">{t("an.revCompleted")}</div></div>
+        <div className="an-kpi"><div className="an-kpi-v">{vnd(m.openValue)}</div><div className="an-kpi-l">{t("an.openValue")}</div></div>
         <div className="an-kpi"><div className="an-kpi-v">{m.count}</div><div className="an-kpi-l">{t("an.orders")}</div></div>
         <div className="an-kpi"><div className="an-kpi-v">{m.avgBrew != null ? m.avgBrew.toFixed(1) + "m" : "—"}</div><div className="an-kpi-l">{t("an.avgBrew")}</div></div>
         <div className="an-kpi"><div className="an-kpi-v">{m.avgRating != null ? m.avgRating.toFixed(2) + "★" : "—"}</div><div className="an-kpi-l">{t("an.avgRating")}</div></div>

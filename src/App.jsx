@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { AuthProvider, useAuth } from "./lib/AuthContext.jsx";
 import { LanguageProvider } from "./lib/i18n.jsx";
+import { useLang } from "./lib/i18n.jsx";
 import { supabase } from "./lib/supabase.js";
 import AuthModal from "./components/AuthModal.jsx";
 import Storefront from "./Storefront.jsx";
@@ -13,6 +14,7 @@ import ShopStatusBadge from "./components/ShopStatusBadge.jsx";
 
 function Shell() {
   const { user, name, isOwner, signOut, ready, profile } = useAuth();
+  const { t } = useLang();
   const [authOpen, setAuthOpen] = useState(false);
   const [ownerOpen, setOwnerOpen] = useState(false);
   const [ordersOpen, setOrdersOpen] = useState(false);
@@ -32,12 +34,13 @@ function Shell() {
     try {
       // Server computes prices atomically (place_order RPC); client sends config+qty only.
       const p_items = cart.map((it) => ({ config: it.config, qty: it.qty }));
+      const reqId = (crypto?.randomUUID && crypto.randomUUID()) || (Date.now() + "-" + Math.random().toString(36).slice(2));
       const { data, error } = await supabase.rpc("place_order", {
-        p_items, p_phone: details.phone || "", p_note: details.note || "",
+        p_items, p_phone: details.phone || "", p_note: details.note || "", p_request_id: reqId,
       });
       if (error || !data) {
         console.error("[place_order]", error);
-        setNotice(error?.message || "Couldn't place order. Try again.");
+        setNotice(error?.message || t("app.orderFailed"));
         setTimeout(() => setNotice(null), 5000);
         return false;
       }
@@ -62,7 +65,7 @@ function Shell() {
         (p) => {
           if (p.new.status === "ready" && !notified.has(p.new.id)) {
             notified.add(p.new.id);
-            setToast(`Order ${p.new.order_no || ""} is ready — come pick up! ☕`);
+            setToast(t("app.readyToast", { no: p.new.order_no || "" }));
             setTimeout(() => setToast(null), 6000);
           }
         })
@@ -88,7 +91,7 @@ function Shell() {
     const ch = supabase.channel("owner-neworders")
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "orders" }, (p) => {
         setNewOrders((n) => n + 1);
-        setOwnerToast(`New order ${p.new.order_no || ""}!`);
+        setOwnerToast(t("app.newOrder", { no: p.new.order_no || "" }));
         beep();
         setTimeout(() => setOwnerToast(null), 6000);
       })
@@ -116,13 +119,13 @@ function Shell() {
       {user && !isOwner && (
         <>
           <button className="mxr-ordersbtn" onClick={() => setOrdersOpen(true)}>
-            <Receipt size={16} /> My Orders
+            <Receipt size={16} /> {t("app.myOrders")}
           </button>
           <ChatDock />
         </>
       )}
       {isOwner && (
-        <button className="mxr-ownerbtn" onClick={() => { setOwnerOpen(true); setNewOrders(0); }}>🐰 Manage shop{newOrders > 0 && <span className="mxr-count">{newOrders}</span>}</button>
+        <button className="mxr-ownerbtn" onClick={() => { setOwnerOpen(true); setNewOrders(0); }}>🐰 {t("app.manage")}{newOrders > 0 && <span className="mxr-count">{newOrders}</span>}</button>
       )}
 
       {confirm && (

@@ -4,6 +4,8 @@ const LangCtx = createContext(null);
 
 const DICT = {
   en: {
+    "app.myOrders": "My Orders", "app.manage": "Manage shop", "app.newOrder": "New order {no}!",
+    "app.readyToast": "Order {no} is ready — come pick up! ☕", "app.orderFailed": "Couldn't place order. Try again.",
     "od.manager": "manager", "od.hi": "Hi {name}", "od.orders": "Orders", "od.messages": "Messages",
     "od.shop": "Shop", "od.insights": "Insights", "od.close": "Close",
     "od.loadingOrders": "Loading orders…", "od.noOrders": "No orders yet. New orders appear here in real time.",
@@ -18,7 +20,7 @@ const DICT = {
     "sc.pause": "Pause orders", "sc.closeShop": "Close shop", "sc.msgLabel": "Message to customers (optional)",
     "sc.msgPh": "e.g. Busy right now, thanks for waiting 🍵", "sc.save": "Save",
     "sc.availHead": "Menu availability", "sc.available": "Available", "sc.soldout": "Sold out",
-    "an.loading": "Crunching numbers…", "an.noData": "No data yet.", "an.revenue": "Revenue (non-cancelled)",
+    "an.loading": "Crunching numbers…", "an.noData": "No data yet.", "an.revenue": "Revenue (non-cancelled)", "an.revCompleted": "Completed revenue", "an.openValue": "Open orders value",
     "an.orders": "Orders", "an.avgBrew": "Avg brew time", "an.avgRating": "Avg rating", "an.cancelRate": "Cancel rate",
     "an.revDays": "Revenue · last 7 days", "an.byHour": "Orders by hour", "an.topDrinks": "Top drinks",
     "an.ratingByProduct": "Rating by product", "an.noSales": "No sales yet.", "an.noRatings": "No ratings yet.", "an.sold": "sold",
@@ -71,6 +73,8 @@ const DICT = {
     "toast.failed": "Couldn't place order. Try again.",
   },
   vi: {
+    "app.myOrders": "Đơn của tôi", "app.manage": "Quản lý quán", "app.newOrder": "Đơn mới {no}!",
+    "app.readyToast": "Đơn {no} đã xong — mời lấy! ☕", "app.orderFailed": "Không đặt được đơn. Thử lại nhé.",
     "od.manager": "quản lý", "od.hi": "Chào {name}", "od.orders": "Đơn hàng", "od.messages": "Tin nhắn",
     "od.shop": "Cửa hàng", "od.insights": "Thống kê", "od.close": "Đóng",
     "od.loadingOrders": "Đang tải đơn…", "od.noOrders": "Chưa có đơn nào. Đơn mới sẽ hiện ở đây theo thời gian thực.",
@@ -85,7 +89,7 @@ const DICT = {
     "sc.pause": "Tạm dừng nhận", "sc.closeShop": "Đóng cửa", "sc.msgLabel": "Lời nhắn cho khách (tuỳ chọn)",
     "sc.msgPh": "vd: Đang đông, cảm ơn bạn đã chờ 🍵", "sc.save": "Lưu",
     "sc.availHead": "Món còn/hết", "sc.available": "Còn hàng", "sc.soldout": "Hết hàng",
-    "an.loading": "Đang tính toán…", "an.noData": "Chưa có dữ liệu.", "an.revenue": "Doanh thu (không tính huỷ)",
+    "an.loading": "Đang tính toán…", "an.noData": "Chưa có dữ liệu.", "an.revenue": "Doanh thu (không tính huỷ)", "an.revCompleted": "Doanh thu đã xong", "an.openValue": "Giá trị đơn đang mở",
     "an.orders": "Số đơn", "an.avgBrew": "TG pha TB", "an.avgRating": "Điểm TB", "an.cancelRate": "Tỷ lệ huỷ",
     "an.revDays": "Doanh thu · 7 ngày qua", "an.byHour": "Đơn theo giờ", "an.topDrinks": "Món bán chạy",
     "an.ratingByProduct": "Điểm theo món", "an.noSales": "Chưa có đơn bán.", "an.noRatings": "Chưa có đánh giá.", "an.sold": "ly",
