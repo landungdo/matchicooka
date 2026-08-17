@@ -1,9 +1,8 @@
 -- ============================================================
--- matchicooka — place_order (CANONICAL, FINAL).
--- Supersedes every earlier place_order definition
--- (hardening / shopstatus / step5 / step6). Run once.
--- Adds: strict validation, extra de-dupe, idempotency, locked grants.
+-- 0005_functions — all RPCs (server-priced, atomic, state-machine, reviews)
+-- plus lock-down of every SECURITY DEFINER function.
 -- ============================================================
+
 
 -- idempotency key (one order per (user, request id))
 alter table public.orders add column if not exists client_request_id text;
@@ -111,3 +110,76 @@ end $$;
 revoke all on function public.place_order(jsonb, text, text, text) from public;
 revoke all on function public.place_order(jsonb, text, text, text) from anon;
 grant execute on function public.place_order(jsonb, text, text, text) to authenticated;
+
+-- ---------- transition_order_status (owner state machine) ----------
+drop function if exists public.transition_order_status(uuid, text);
+create or replace function public.transition_order_status(p_order uuid, p_next text, p_reason text default null)
+returns void language plpgsql security definer set search_path = public as $$
+declare v_cur text;
+begin
+  if not public.is_owner() then raise exception 'Owner only'; end if;
+  select status into v_cur from public.orders where id = p_order;
+  if v_cur is null then raise exception 'Order not found'; end if;
+  if not (
+      (v_cur='received' and p_next in ('making','cancelled')) or
+      (v_cur='making'   and p_next in ('ready','cancelled')) or
+      (v_cur='ready'    and p_next in ('completed','cancelled'))
+  ) then raise exception 'Invalid transition % -> %', v_cur, p_next; end if;
+  update public.orders set
+     status = p_next,
+     cancel_reason = case when p_next='cancelled' then left(nullif(p_reason,''),200) else cancel_reason end,
+     making_at    = case when p_next='making'    then now() else making_at end,
+     ready_at     = case when p_next='ready'     then now() else ready_at end,
+     completed_at = case when p_next='completed' then now() else completed_at end
+   where id = p_order;
+end $$;
+
+-- ---------- submit_review (customer, after completed) ----------
+create or replace function public.submit_review(p_order uuid, p_comment text, p_items jsonb)
+returns void language plpgsql security definer set search_path = public as $$
+declare v_overall integer;
+begin
+  if not exists (select 1 from public.orders where id=p_order and user_id=auth.uid() and status='completed')
+  then raise exception 'You can review an order once it is completed.'; end if;
+
+  with r as (
+    select distinct on ((e->>'id')::uuid) (e->>'id')::uuid as id, (e->>'rating')::int as rating
+    from jsonb_array_elements(p_items) e where (e->>'rating') is not null order by (e->>'id')::uuid
+  )
+  update public.order_items oi set item_rating = r.rating
+  from r where oi.id=r.id and oi.order_id=p_order and oi.user_id=auth.uid();
+
+  select round(avg(rating))::int into v_overall from (
+    select distinct on ((e->>'id')::uuid) (e->>'rating')::numeric as rating
+    from jsonb_array_elements(p_items) e where (e->>'rating') is not null order by (e->>'id')::uuid
+  ) x;
+  if v_overall is null then raise exception 'Please give at least one star.'; end if;
+
+  insert into public.reviews (order_id, user_id, rating, comment, updated_at)
+  values (p_order, auth.uid(), v_overall, left(nullif(p_comment,''),300), now())
+  on conflict (order_id) do update set rating=excluded.rating, comment=excluded.comment, updated_at=now();
+end $$;
+
+-- ---------- cancel_my_order (customer, only while received) ----------
+create or replace function public.cancel_my_order(p_order uuid)
+returns void language plpgsql security definer set search_path = public as $$
+begin
+  update public.orders set status='cancelled'
+   where id=p_order and user_id=auth.uid() and status='received';
+  if not found then raise exception 'Order cannot be cancelled (not yours, or already being made).'; end if;
+end $$;
+
+-- ---------- lock down every SECURITY DEFINER function ----------
+revoke all on function public.is_owner() from public;
+grant  execute on function public.is_owner() to authenticated;
+revoke all on function public.next_order_no() from public;
+do $$ begin revoke all on function public.set_order_no() from public; exception when undefined_function then null; end $$;
+do $$ begin revoke all on function public.handle_new_user() from public; exception when undefined_function then null; end $$;
+revoke all on function public.transition_order_status(uuid, text, text) from public;
+grant  execute on function public.transition_order_status(uuid, text, text) to authenticated;
+revoke all on function public.submit_review(uuid, text, jsonb) from public;
+grant  execute on function public.submit_review(uuid, text, jsonb) to authenticated;
+revoke all on function public.cancel_my_order(uuid) from public;
+grant  execute on function public.cancel_my_order(uuid) to authenticated;
+revoke all on function public.place_order(jsonb, text, text, text) from public;
+grant  execute on function public.place_order(jsonb, text, text, text) to authenticated;
