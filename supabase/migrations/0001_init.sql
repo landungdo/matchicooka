@@ -49,6 +49,19 @@ create policy profiles_select on public.profiles for select using (id=auth.uid()
 drop policy if exists profiles_update on public.profiles;
 create policy profiles_update on public.profiles for update using (id=auth.uid());
 
+-- prevent customers from escalating their own role (role changes = admin/migration only)
+create or replace function public.prevent_role_change()
+returns trigger language plpgsql security definer set search_path = public as $$
+begin
+  if new.role is distinct from old.role and not public.is_owner() then
+    raise exception 'You cannot change your role';
+  end if;
+  return new;
+end $$;
+drop trigger if exists trg_prevent_role_change on public.profiles;
+create trigger trg_prevent_role_change before update on public.profiles
+  for each row execute function public.prevent_role_change();
+
 drop policy if exists messages_select on public.messages;
 create policy messages_select on public.messages for select using (room_user_id=auth.uid() or public.is_owner());
 drop policy if exists messages_insert on public.messages;

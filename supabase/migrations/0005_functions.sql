@@ -115,10 +115,10 @@ grant execute on function public.place_order(jsonb, text, text, text) to authent
 drop function if exists public.transition_order_status(uuid, text);
 create or replace function public.transition_order_status(p_order uuid, p_next text, p_reason text default null)
 returns void language plpgsql security definer set search_path = public as $$
-declare v_cur text;
+declare v_cur text; v_rows int;
 begin
   if not public.is_owner() then raise exception 'Owner only'; end if;
-  select status into v_cur from public.orders where id = p_order;
+  select status into v_cur from public.orders where id = p_order for update;
   if v_cur is null then raise exception 'Order not found'; end if;
   if not (
       (v_cur='received' and p_next in ('making','cancelled')) or
@@ -131,7 +131,9 @@ begin
      making_at    = case when p_next='making'    then now() else making_at end,
      ready_at     = case when p_next='ready'     then now() else ready_at end,
      completed_at = case when p_next='completed' then now() else completed_at end
-   where id = p_order;
+   where id = p_order and status = v_cur;
+  get diagnostics v_rows = row_count;
+  if v_rows = 0 then raise exception 'Order changed, please refresh'; end if;
 end $$;
 
 -- ---------- submit_review (customer, after completed) ----------

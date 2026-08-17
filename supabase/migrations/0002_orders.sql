@@ -91,10 +91,7 @@ create policy items_select on public.order_items for select using (user_id=auth.
 
 drop policy if exists reviews_select on public.reviews;
 create policy reviews_select on public.reviews for select using (user_id=auth.uid() or public.is_owner());
-drop policy if exists reviews_upsert on public.reviews;
-create policy reviews_upsert on public.reviews for insert with check (user_id=auth.uid());
-drop policy if exists reviews_update on public.reviews;
-create policy reviews_update on public.reviews for update using (user_id=auth.uid());
+-- reviews are written ONLY through submit_review() (see 0005); no direct insert/update policies.
 
 -- ---------- realtime ----------
 do $$ begin alter publication supabase_realtime add table public.orders;      exception when duplicate_object then null; end $$;
@@ -118,3 +115,9 @@ select id, order_no,
        round(extract(epoch from (ready_at - making_at))/60.0, 1) as brew_minutes,
        status
 from public.orders;
+
+-- lock analytics views: respect caller RLS, no anon
+alter view public.v_product_ratings set (security_invoker = true);
+alter view public.v_order_timing    set (security_invoker = true);
+revoke all on public.v_product_ratings from anon;
+revoke all on public.v_order_timing    from anon;
